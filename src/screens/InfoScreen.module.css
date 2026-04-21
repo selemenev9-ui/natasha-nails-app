@@ -1,0 +1,155 @@
+.info {
+  position: relative;
+  height: 100dvh;
+  overflow: hidden;
+  color: var(--ink);
+}
+
+.ambientGlow {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(95px);
+}
+
+.inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+  padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + var(--tabbar-space));
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+}
+
+.inner > * {
+  flex-shrink: 0;
+}
+
+.inner::-webkit-scrollbar {
+  display: none;
+}
+
+.heading {
+  margin-bottom: 8px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  letter-spacing: 0.08em;
+}
+
+.galleryRow {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.galleryCard {
+  flex: 0 0 220px;
+  height: 280px;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+}
+
+.galleryGlow {
+  position: absolute;
+  inset: 0;
+  filter: blur(22px);
+}
+
+.galleryMeta {
+  position: relative;
+  width: 100%;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 1;
+}
+
+.galleryMeta p {
+  margin: 0;
+  font-size: 18px;
+  font-family: var(--font-display);
+}
+
+.galleryMeta span {
+  font-size: 13px;
+  color: var(--ink-60);
+}
+
+.card {
+  padding: 20px;
+}
+
+.cardLabel {
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-60);
+  margin-bottom: 8px;
+}
+
+.cardValue {
+  font-size: 15px;
+  margin: 2px 0;
+  color: var(--ink);
+}
+
+.cardLink {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.quote {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--ink-60);
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.link {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--ink);
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

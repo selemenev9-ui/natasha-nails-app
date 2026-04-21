@@ -1,0 +1,62 @@
+.container {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.categoryBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.categoryTitle {
+  font-size: 13px;
+  color: var(--ink-60);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.optionsGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.optionCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 16px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.2s var(--smooth), background 0.2s var(--smooth);
+}
+
+.optionCardActive {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.optionLabel {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.optionPrice {
+  font-size: 13px;
+  color: var(--ink-60);
+}
+
+.bookButton {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.bookButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

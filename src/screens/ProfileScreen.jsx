@@ -1,0 +1,143 @@
+import { useEffect, useState } from 'react';
+import bridge from '@vkontakte/vk-bridge';
+import { motion } from 'framer-motion';
+import { useVK } from '../contexts/VKContext.jsx';
+import BeautyCard from '../components/BeautyCard.jsx';
+import CareAccordion from '../components/CareAccordion.jsx';
+import { getDailyTips } from '../data/careHub';
+import { API_URL } from '../utils/config.js';
+import styles from './ProfileScreen.module.css';
+
+function formatDate(timestamp) {
+  if (!timestamp) return '—';
+  // YDB Datetime возвращает секунды от эпохи
+  const ms = timestamp > 1e10 ? timestamp : timestamp * 1000;
+  return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function HistorySection({ clientId }) {
+  const [appointments, setAppointments] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clientId) { setLoading(false); return; }
+    fetch(`${API_URL}?action=history&client_id=${clientId}`)
+      .then((r) => r.json())
+      .then((data) => setAppointments(data.appointments || []))
+      .catch(() => setAppointments([]))
+      .finally(() => setLoading(false));
+  }, [clientId]);
+
+  if (loading) return <p className={styles.historyEmpty}>Загрузка истории…</p>;
+  if (!clientId) return <p className={styles.historyEmpty}>Войдите через VK чтобы видеть историю</p>;
+  if (!appointments?.length) return <p className={styles.historyEmpty}>Визитов пока нет — самое время записаться 💅</p>;
+
+  const totalSpent = appointments.reduce((sum, a) => sum + (a.total_price || 0), 0);
+  const now = Date.now() / 1000;
+  const upcoming = appointments.find((a) => a.appointment_date > now);
+  const past = appointments.filter((a) => a.appointment_date <= now);
+
+  return (
+    <div className={styles.historySection}>
+      {/* Статистика */}
+      <div className={styles.statsRow}>
+        <div className={`${styles.statCard} glass-panel`}>
+          <span className={styles.statValue}>{appointments.length}</span>
+          <span className={styles.statLabel}>визитов</span>
+        </div>
+        <div className={`${styles.statCard} glass-panel`}>
+          <span className={styles.statValue}>{totalSpent.toLocaleString('ru-RU')} ₽</span>
+          <span className={styles.statLabel}>потрачено</span>
+        </div>
+      </div>
+
+      {/* Следующий визит */}
+      {upcoming && (
+        <div className={`${styles.upcomingCard} glass-panel`}>
+          <p className={styles.upcomingLabel}>⏰ Следующий визит</p>
+          <p className={styles.upcomingDate}>{formatDate(upcoming.appointment_date)}</p>
+          <p className={styles.upcomingService}>{upcoming.service_id}</p>
+        </div>
+      )}
+
+      {/* История */}
+      {past.length > 0 && (
+        <div className={styles.historyList}>
+          <p className={styles.sectionLabel}>История визитов</p>
+          {past.map((a) => (
+            <div key={a.id} className={`${styles.historyCard} glass-panel`}>
+              <div className={styles.historyCardLeft}>
+                <p className={styles.historyService}>{a.title || a.service_id}</p>
+                <p className={styles.historyDate}>{formatDate(a.appointment_date)}</p>
+              </div>
+              {a.total_price > 0 && (
+                <p className={styles.historyPrice}>{a.total_price.toLocaleString('ru-RU')} ₽</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ProfileScreen() {
+  const { user, cardTheme, toggleTheme, seenTips, isBridgeLoading, isVKEnv } = useVK();
+  const firstName = user?.first_name || 'гость';
+  const avatar = user?.photo_200 || '';
+  const [dailyMix, setDailyMix] = useState([]);
+
+  useEffect(() => {
+    if (isBridgeLoading) return;
+    const { tips, newSeenIds } = getDailyTips(3, seenTips);
+    setDailyMix(tips);
+    if (newSeenIds.length > seenTips.length && isVKEnv) {
+      bridge.send('VKWebAppStorageSet', { key: 'seen_tips', value: JSON.stringify(newSeenIds) }).catch(() => {});
+    }
+  }, [isBridgeLoading, isVKEnv, seenTips]);
+
+  const openAdmin = () => window.open('https://vk.me/natasha_premium_lab', '_blank');
+
+  return (
+    <div className={styles.profile}>
+      <motion.div
+        className={styles.ambientGlow}
+        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(76, 29, 149, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(120, 53, 15, 0.4), transparent 65%), #0a0a0c' }}
+        transition={{ duration: 0.8, ease: 'easeInOut' }}
+      />
+      <div className={styles.inner}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Рады видеть тебя, {firstName}</h1>
+          {avatar
+            ? <img className={styles.avatar} src={avatar} alt={firstName} />
+            : <div className={styles.avatarPlaceholder} aria-hidden="true" />}
+        </header>
+
+        {/* История визитов */}
+        <section className={styles.beautyIdSection}>
+          <p className={styles.sectionLabel}>Мои визиты</p>
+          <HistorySection clientId={user?.id ? String(user.id) : null} />
+        </section>
+
+        {/* Beauty ID */}
+        <section className={styles.beautyIdSection}>
+          <p className={styles.sectionLabel}>Beauty ID</p>
+          <button className={`${styles.themeToggle} glass-panel`} onClick={toggleTheme} type="button">
+            {cardTheme === 'dark' ? '☀️ Светлый дизайн' : '🌙 Тёмный дизайн'}
+          </button>
+          <div className={`${styles.beautyIdContainer} glass-panel`}>
+            <BeautyCard firstName={user?.first_name} vkId={user?.id} theme={cardTheme} />
+          </div>
+          <div className={`${styles.careLibrary} glass-panel`}>
+            <h2 className={styles.careTitle}>Beauty Mix на сегодня</h2>
+            <CareAccordion data={dailyMix} />
+          </div>
+        </section>
+
+        <footer className={styles.footer}>
+          <button className="btn-ink glass-panel" onClick={openAdmin}>Написать администратору</button>
+        </footer>
+      </div>
+    </div>
+  );
+}

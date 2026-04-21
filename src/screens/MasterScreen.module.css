@@ -1,0 +1,235 @@
+.master {
+  position: relative;
+  min-height: 100dvh;
+  padding-bottom: 80px;
+  overflow-y: auto;
+}
+
+.ambientGlow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  padding: 24px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kicker {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--ink-60);
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink-100);
+  margin: 0;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tab {
+  padding: 12px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  color: var(--ink-60);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.tabActive {
+  color: var(--ink-100);
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.groupLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-60);
+  margin: 8px 0 4px;
+}
+
+.card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardHighlight {
+  border-left: 3px solid rgba(76, 29, 149, 0.8);
+}
+
+.cardMuted {
+  opacity: 0.6;
+}
+
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-100);
+  margin: 0;
+}
+
+.cardPrice {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-100);
+  white-space: nowrap;
+  margin: 0;
+}
+
+.cardSub {
+  font-size: 12px;
+  color: var(--ink-60);
+  margin: 0;
+}
+
+.editRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.editInput {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ink-100);
+  font-size: 14px;
+}
+
+.btnEdit {
+  font-size: 12px;
+  color: var(--ink-60);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 2px;
+  text-align: left;
+}
+
+.btnSave {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(76, 29, 149, 0.7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnCancel {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-60);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.empty {
+  text-align: center;
+  color: var(--ink-60);
+  font-size: 14px;
+  padding: 30px 0;
+}
+
+.denied {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: var(--ink-60);
+}
+
+.actionsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.btnAdd {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px dashed rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.04);
+  color: var(--ink-60);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnDelete {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(220,38,38,0.7);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnDeleteSoft {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  color: var(--ink-60);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.hiddenBadge {
+  font-size: 10px;
+  background: rgba(255,255,255,0.1);
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  color: var(--ink-60);
+}

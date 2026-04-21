@@ -1,0 +1,79 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.overlayBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 430px;
+  margin: 0 auto;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(220, 235, 245, 0.22) 50%,
+    rgba(240, 248, 255, 0.32) 100%
+  );
+  backdrop-filter: blur(40px) saturate(180%) brightness(1.08);
+  -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(1.08);
+  border-radius: 28px 28px 0 0;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.6);
+  border-left: 0.5px solid rgba(255, 255, 255, 0.4);
+  border-right: 0.5px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.9),
+    inset 1px 0 0 rgba(255, 255, 255, 0.5),
+    inset -1px 0 0 rgba(255, 255, 255, 0.5),
+    0 -12px 60px rgba(0, 0, 0, 0.25);
+  padding: 16px 24px calc(var(--safe-bottom) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.grabber {
+  width: 48px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+  align-self: center;
+}
+
+.title {
+  font-size: 20px;
+  font-family: var(--font-display);
+  margin: 4px 0 0;
+  color: var(--ink);
+}
+
+.description {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--ink-60);
+}
+
+.price {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 2px;
+}
+
+.drawer :global(.btn-ink) {
+  width: 100%;
+  margin-top: 4px;
+  color: var(--ink) !important;
+}

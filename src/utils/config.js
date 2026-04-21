@@ -1,0 +1,1 @@
+export const API_URL = 'https://functions.yandexcloud.net/d4eb8ife6rqecrip6jp3';

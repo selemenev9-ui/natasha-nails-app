@@ -1,0 +1,6 @@
+{
+  "static_path": "dist",
+  "endpoint_main": "index.html",
+  "endpoint_mobile": "index.html",
+  "app_id": 0
+}

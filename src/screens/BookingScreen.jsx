@@ -315,6 +315,7 @@ export default function BookingScreen({ onConfirmChange }) {
           const body = {
             service_id: payload.service.id,
             client_id: user.id,
+            client_name: user.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
             date: bookingDate,
             totalPrice: payload.totalPrice || getNumericPrice(payload.service)
           };

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { API_URL } from '../utils/config.js';
 import styles from './BookingModal.module.css';
 
 const HOURS = Array.from({ length: 20 }, (_, i) => {
@@ -16,6 +17,15 @@ function todayStr() {
 export default function BookingModal({ isOpen, onClose, onConfirm }) {
   const [date, setDate] = useState(todayStr());
   const [time, setTime] = useState('');
+  const [busySlots, setBusySlots] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen || !date) return;
+    fetch(`${API_URL}?action=busy_slots&date=${date}`)
+      .then((r) => r.json())
+      .then((d) => setBusySlots(d.slots || []))
+      .catch(() => {});
+  }, [isOpen, date]);
 
   const handleConfirm = () => {
     if (!date || !time) return;
@@ -47,13 +57,19 @@ export default function BookingModal({ isOpen, onClose, onConfirm }) {
             <div className={styles.section}>
               <p className={styles.label}>Время</p>
               <div className={styles.timeGrid}>
-                {HOURS.map(h => (
-                  <button key={h}
-                    className={`${styles.timeSlot} ${time === h ? styles.timeSlotActive : ''}`}
-                    onClick={() => setTime(h)}>
-                    {h}
-                  </button>
-                ))}
+                {HOURS.map((h) => {
+                  const busy = busySlots.includes(h);
+                  return (
+                    <button
+                      key={h}
+                      disabled={busy}
+                      className={`${styles.timeSlot} ${time === h ? styles.timeSlotActive : ''} ${busy ? styles.timeSlotBusy : ''}`}
+                      onClick={() => !busy && setTime(h)}
+                    >
+                      {h}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

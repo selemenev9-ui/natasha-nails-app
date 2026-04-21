@@ -4,7 +4,7 @@ import useMagnetic from '../hooks/useMagnetic.js';
 import { useVK } from '../contexts/VKContext.jsx';
 import styles from './TabBar.module.css';
 
-const MASTER_IDS = ['80557585', '187729875', '123456789'];
+const MASTER_IDS = ['80557585', '187729875'];
 
 const BASE_TABS = [
   { id: 'home',      label: 'Дом',     icon: IconHome },

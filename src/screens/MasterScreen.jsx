@@ -4,7 +4,7 @@ import { useVK } from '../contexts/VKContext.jsx';
 import { API_URL } from '../utils/config.js';
 import styles from './MasterScreen.module.css';
 
-const MASTER_IDS = ['80557585', '187729875', '123456789'];
+const MASTER_IDS = ['80557585', '187729875'];
 const CATEGORIES = [
   { id: 'nails', label: 'Маникюр & Педикюр' },
   { id: 'solarium', label: 'Солярий' },

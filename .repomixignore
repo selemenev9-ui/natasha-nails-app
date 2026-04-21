@@ -1,0 +1,26 @@
+# 1. Зависимости и сборка (на случай если не подхватится .gitignore)
+node_modules/
+dist/
+.vite/
+
+# 2. Лок-файлы (Главная причина 350к+ токенов)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# 3. Тяжелый статический контент
+beauty_tips_review.md
+src/data/careHub.js
+
+# 4. Изображения и медиа-ассеты
+public/portfolio/
+src/assets/
+*.webp
+*.jpg
+*.jpeg
+*.png
+*.svg
+*.ico
+
+# 5. Выхлоп самого сборщика (чтобы не зациклить чтение)
+repomix-output.xml

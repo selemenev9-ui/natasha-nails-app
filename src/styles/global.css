@@ -1,18 +1,23 @@
 :root {
-  --cream: #FDFCFB;
+  --cream: #F8F6F2;
   --cream-dark: #EAE5DE;
   --linen: #F0EBE1;
   --glass-white: rgba(255, 255, 255, 0.5);
   --glass-border: rgba(255, 255, 255, 0.8);
   --glass-shine: rgba(255, 255, 255, 0.9);
-  --ink: #141414;
-  --ink-60: rgba(20, 20, 20, 0.6);
-  --ink-30: rgba(20, 20, 20, 0.3);
+  --ink: #1C1814;
+  --ink-60: rgba(28, 24, 20, 0.65);
+  --ink-30: rgba(28, 24, 20, 0.35);
   --ink-10: rgba(20, 20, 20, 0.1);
   --chrome-base: #F7F5F0;
   --chrome-purple: #8C7A6B;
   --chrome-bronze: #D4C5B3;
   --chrome-overlay: rgba(247, 245, 240, 0.55);
+  --chrome-gold: #D2C2AC;
+  --chrome-light: #E8D9C4;
+  --glass-light: rgba(255, 255, 255, 0.78);
+  --glass-medium: rgba(255, 255, 255, 0.55);
+  --glass-heavy: rgba(255, 255, 255, 0.92);
   --font-display: 'Playfair Display', serif;
   --font-body: 'Space Grotesk', sans-serif;
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -116,16 +121,17 @@ button {
   pointer-events: none;
 }
 
+
 .glass-panel {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(24px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(150%) !important;
+  background: linear-gradient(160deg, var(--glass-heavy), var(--glass-medium)) !important;
+  backdrop-filter: blur(30px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(160%) !important;
+  border: 1px solid var(--glass-heavy) !important;
   box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.9),
-    inset -1px -1px 0 rgba(255, 255, 255, 0.3),
-    0 12px 32px rgba(28, 27, 26, 0.04) !important;
+    inset 0 1px 0 var(--glass-light),
+    inset 0 -1px 0 var(--glass-medium),
+    0 18px 36px rgba(28, 24, 20, 0.12) !important;
   border-radius: var(--radius-card) !important;
-  border: none !important;
   transition: transform 0.25s var(--spring), background 0.25s ease !important;
 }
 
@@ -145,17 +151,19 @@ button {
 }
 
 .btn-ink {
-  background: linear-gradient(135deg, #2A2826 0%, #1C1B1A 100%) !important;
-  color: #FFFFFF !important;
-  border: none !important;
+  background: linear-gradient(140deg, var(--ink) 0%, var(--chrome-gold) 120%) !important;
+  color: var(--cream) !important;
+  border: 1px solid rgba(28, 24, 20, 0.45) !important;
   border-radius: var(--radius-pill) !important;
   padding: 14px 28px;
   font-size: 14px;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 8px 20px rgba(28, 27, 26, 0.12) !important;
+  box-shadow:
+    inset 0 1px 0 var(--glass-light),
+    0 14px 26px rgba(28, 24, 20, 0.18) !important;
   transition: transform 0.25s var(--spring), box-shadow 0.25s var(--spring) !important;
 }
 
@@ -175,8 +183,8 @@ button {
 }
 
 .btn-glass {
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: var(--glass-medium);
+  border: 1px solid var(--glass-heavy);
   border-radius: var(--radius-pill);
   padding: 14px 28px;
   font-size: 14px;
@@ -184,8 +192,10 @@ button {
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(24px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(28px);
+  box-shadow:
+    inset 0 1px 0 var(--glass-light),
+    0 12px 28px rgba(28, 24, 20, 0.15);
   transition: transform 0.25s var(--spring);
 }
 
@@ -196,12 +206,22 @@ button {
   left: 0;
   right: 0;
   height: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
+  background: linear-gradient(180deg, var(--glass-light) 0%, transparent 100%);
   border-radius: var(--radius-pill) var(--radius-pill) 0 0;
 }
 
 .btn-glass:active {
   transform: scale(0.94);
+}
+
+.card-premium {
+  background: linear-gradient(180deg, var(--chrome-light), var(--cream)) !important;
+  border: 1px solid rgba(210, 194, 172, 0.6) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow:
+    inset 0 1px 0 var(--glass-heavy),
+    0 20px 40px rgba(28, 24, 20, 0.12) !important;
+  color: var(--ink);
 }
 
 .section-subtle {

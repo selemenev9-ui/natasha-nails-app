@@ -1,8 +1,9 @@
 .profile {
   position: relative;
   min-height: 100dvh;
-  padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + var(--tabbar-space));
+  padding: calc(var(--safe-top) + 32px) 24px calc(var(--safe-bottom) + var(--tabbar-space));
   overflow-x: hidden;
+  background: radial-gradient(circle at 15% 10%, rgba(232, 217, 196, 0.35), transparent 55%), var(--cream);
 }
 
 .ambientGlow {
@@ -21,14 +22,16 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
+  max-width: 420px;
+  margin: 0 auto;
 }
 
 .header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 18px;
   text-align: center;
 }
 
@@ -56,14 +59,14 @@
 .beautyIdSection {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
 }
 
 .sectionLabel {
   margin: 0;
-  color: var(--ink);
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  color: var(--ink-60);
+  font-size: 11px;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
 }
 
@@ -81,28 +84,42 @@
 
 .beautyIdContainer {
   position: relative;
-  height: 220px;
-  border-radius: 20px;
-  padding: 6px;
+  height: 240px;
+  border-radius: 24px;
+  padding: 8px;
   overflow: visible !important;
   display: flex;
   justify-content: center;
+  background: var(--glass-medium);
+  border: 1px solid var(--glass-heavy);
+  box-shadow:
+    inset 0 1px 0 var(--glass-light),
+    0 18px 32px rgba(28, 24, 20, 0.08);
+  backdrop-filter: blur(24px);
 }
 
 .careLibrary {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 20px;
+  background: var(--glass-medium);
+  border: 1px solid var(--glass-heavy);
+  box-shadow:
+    inset 0 1px 0 var(--glass-light),
+    0 18px 38px rgba(28, 24, 20, 0.08);
+  backdrop-filter: blur(22px);
 }
 
 .careTitle {
   margin: 4px 0 0;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 500;
-  line-height: 1.05;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
 }
 
 .footer {

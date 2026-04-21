@@ -126,53 +126,9 @@ export default function BookingScreen({ onConfirmChange }) {
       setIsBookingOpen(true);
       return;
     }
-
-    if (isSubmitting) return;
-    if (!payload.service?.id) {
-      setBookingError('Не удалось определить услугу. Попробуйте обновить страницу.');
-      return;
-    }
-    if (!user?.id) {
-      setBookingError('Авторизуйтесь через VK, чтобы продолжить.');
-      return;
-    }
-
-    setBookingError(null);
-    setIsSubmitting(true);
-
-    const bookingDate = payload.date || selectedDate;
-
-    const body = {
-      service_id: payload.service.id,
-      client_id: user.id,
-      date: bookingDate
-    };
-
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Ошибка ${response.status}`);
-      }
-
-      triggerHaptic('medium');
-      setConfirmState({
-        service: payload.service,
-        date: bookingDate,
-        totalPrice: payload.totalPrice || getNumericPrice(payload.service)
-      });
-      onConfirmChange?.(true);
-    } catch (submissionError) {
-      setBookingError(submissionError.message || 'Не удалось создать запись. Попробуйте позже.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Сохраняем payload и открываем выбор времени
+    setActiveService((prev) => ({ ...prev, _pendingPayload: payload }));
+    setIsBookingOpen(true);
   };
 
   const handleBookingClose = () => {
@@ -337,7 +293,52 @@ export default function BookingScreen({ onConfirmChange }) {
 
       {bookingError ? <p className={styles.bookingError}>{bookingError}</p> : null}
 
-      <BookingModal isOpen={isBookingOpen} onClose={handleBookingClose} />
+      <BookingModal
+        isOpen={isBookingOpen}
+        onClose={handleBookingClose}
+        onConfirm={async (dateTime) => {
+          const payload = activeService?._pendingPayload;
+          if (!payload) return;
+          if (isSubmitting) return;
+          if (!payload.service?.id) {
+            setBookingError('Не удалось определить услугу.');
+            return;
+          }
+          if (!user?.id) {
+            setBookingError('Авторизуйтесь через VK.');
+            return;
+          }
+
+          setBookingError(null);
+          setIsSubmitting(true);
+          const bookingDate = `${dateTime.date}T${dateTime.time}:00Z`;
+          const body = {
+            service_id: payload.service.id,
+            client_id: user.id,
+            date: bookingDate,
+            totalPrice: payload.totalPrice || getNumericPrice(payload.service)
+          };
+          try {
+            const response = await fetch(API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+            if (!response.ok) throw new Error(`Ошибка ${response.status}`);
+            triggerHaptic('medium');
+            setConfirmState({
+              service: payload.service,
+              date: bookingDate,
+              totalPrice: payload.totalPrice || getNumericPrice(payload.service)
+            });
+            onConfirmChange?.(true);
+          } catch (err) {
+            setBookingError(err.message || 'Не удалось создать запись.');
+          } finally {
+            setIsSubmitting(false);
+          }
+        }}
+      />
 
       <AnimatePresence>
         {confirmState ? (

@@ -53,3 +53,48 @@
   color: var(--ink-60);
   background: linear-gradient(135deg, rgba(212, 197, 179, 0.35), rgba(247, 245, 240, 0.85));
 }
+
+.handle {
+  width: 40px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.2);
+  margin: 0 auto 16px;
+}
+.title {
+  font-size: 18px; font-weight: 700;
+  color: var(--ink-100); margin: 0 0 20px;
+  text-align: center;
+}
+.section { margin-bottom: 20px; }
+.label {
+  font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.15em; color: var(--ink-60);
+  margin-bottom: 10px;
+}
+.dateInput {
+  width: 100%; padding: 12px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: var(--ink-100); font-size: 15px;
+  box-sizing: border-box;
+}
+.timeGrid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+.timeSlot {
+  padding: 10px 4px; border-radius: 10px; border: none;
+  background: rgba(255,255,255,0.07);
+  color: var(--ink-60); font-size: 13px;
+  cursor: pointer; transition: all 0.15s;
+}
+.timeSlotActive {
+  background: rgba(76,29,149,0.6);
+  color: #fff; font-weight: 600;
+}
+.confirmBtn {
+  width: 100%; padding: 16px; border-radius: 14px; border: none;
+  background: linear-gradient(135deg, rgba(76,29,149,0.9), rgba(120,53,15,0.8));
+  color: #fff; font-size: 15px; font-weight: 700;
+  cursor: pointer; margin-bottom: 10px;
+  opacity: 1; transition: opacity 0.2s;
+}
+.confirmBtn:disabled { opacity: 0.4; cursor: default; }

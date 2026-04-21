@@ -4,7 +4,7 @@ import { useVK } from '../contexts/VKContext.jsx';
 import { API_URL } from '../utils/config.js';
 import styles from './MasterScreen.module.css';
 
-const MASTER_IDS = ['80557585', '187729875'];
+const MASTER_IDS = ['80557585', '187729875', '123456789'];
 const CATEGORIES = [
   { id: 'nails', label: 'Маникюр & Педикюр' },
   { id: 'solarium', label: 'Солярий' },
@@ -255,9 +255,11 @@ export default function MasterScreen() {
 
   return (
     <div className={styles.master}>
-      <motion.div className={styles.ambientGlow}
-        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(76,29,149,0.45), transparent 60%), #0a0a0c' }}
-        transition={{ duration: 0.8 }} />
+      <motion.div
+        className={styles.ambientGlow}
+        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(212, 197, 179, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(140, 122, 107, 0.35), transparent 65%), #F7F5F0' }}
+        transition={{ duration: 0.8 }}
+      />
       <div className={styles.inner}>
         <header className={styles.header}>
           <span className={styles.kicker}>МАСТЕР</span>

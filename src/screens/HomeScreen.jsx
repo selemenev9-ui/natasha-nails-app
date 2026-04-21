@@ -51,13 +51,13 @@ export default function HomeScreen() {
     const h = new Date().getHours();
     let tint;
     if (h >= 5 && h < 11) {
-      tint = 'rgba(76, 29, 149, 0.28)';
+      tint = 'rgba(212, 197, 179, 0.15)';
     } else if (h >= 11 && h < 17) {
-      tint = 'rgba(15, 15, 35, 0.3)';
+      tint = 'rgba(247, 245, 240, 0.2)';
     } else if (h >= 17 && h < 21) {
-      tint = 'rgba(120, 53, 15, 0.35)';
+      tint = 'rgba(140, 122, 107, 0.15)';
     } else {
-      tint = 'rgba(0, 0, 0, 0.45)';
+      tint = 'rgba(28, 27, 26, 0.05)';
     }
     setTimeTint(tint);
   }, []);

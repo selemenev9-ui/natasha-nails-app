@@ -4,14 +4,13 @@ import useMagnetic from '../hooks/useMagnetic.js';
 import { useVK } from '../contexts/VKContext.jsx';
 import styles from './TabBar.module.css';
 
-const MASTER_IDS = ['80557585', '187729875'];
+const MASTER_IDS = ['80557585', '187729875', '123456789'];
 
 const BASE_TABS = [
-  { id: 'home',      label: 'Дом',     icon: IconHome },
-  { id: 'booking',   label: 'Запись',  icon: IconBooking },
-  { id: 'portfolio', label: 'Работы',  icon: IconPortfolio },
-  { id: 'info',      label: 'О нас',   icon: IconInfo },
-  { id: 'profile',   label: 'Кабинет', icon: IconProfile }
+  { id: 'home',    label: 'Дом',     icon: IconHome },
+  { id: 'booking', label: 'Запись',  icon: IconBooking },
+  { id: 'info',    label: 'О нас',   icon: IconInfo },
+  { id: 'profile', label: 'Кабинет', icon: IconProfile }
 ];
 
 const MASTER_TAB = { id: 'master', label: 'Мастер', icon: IconMaster };
@@ -70,16 +69,6 @@ function IconBooking({ active }) {
     <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
       <path d="M8 6h2l.5 2h11L22 6h2a2 2 0 0 1 2 2v18H6V8a2 2 0 0 1 2-2Zm0 7h16" />
       <path d="M11 17h3v7h-3zM18 17h3v7h-3z" />
-    </svg>
-  );
-}
-
-function IconPortfolio({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <path d="M6 10h20v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2Z" />
-      <path d="M12 10V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3" />
-      <path d="M6 15h20" />
     </svg>
   );
 }

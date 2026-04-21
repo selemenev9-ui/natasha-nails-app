@@ -131,7 +131,7 @@
 .statValue {
   font-size: 20px;
   font-weight: 700;
-  color: var(--ink-100);
+  color: var(--ink);
 }
 
 .statLabel {
@@ -158,7 +158,7 @@
 .upcomingDate {
   font-size: 15px;
   font-weight: 600;
-  color: var(--ink-100);
+  color: var(--ink);
 }
 
 .upcomingService {
@@ -182,7 +182,7 @@
 .historyService {
   font-size: 14px;
   font-weight: 600;
-  color: var(--ink-100);
+  color: var(--ink);
 }
 
 .historyDate {
@@ -193,7 +193,7 @@
 .historyPrice {
   font-size: 14px;
   font-weight: 600;
-  color: var(--ink-100);
+  color: var(--ink);
   white-space: nowrap;
 }
 

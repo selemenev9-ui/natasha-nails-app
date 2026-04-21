@@ -102,7 +102,10 @@ export default function ProfileScreen() {
     <div className={styles.profile}>
       <motion.div
         className={styles.ambientGlow}
-        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(76, 29, 149, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(120, 53, 15, 0.4), transparent 65%), #0a0a0c' }}
+        animate={{
+          background:
+            'radial-gradient(circle at 30% 20%, rgba(212, 197, 179, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(240, 235, 225, 0.5), transparent 65%), #F7F5F0'
+        }}
         transition={{ duration: 0.8, ease: 'easeInOut' }}
       />
       <div className={styles.inner}>

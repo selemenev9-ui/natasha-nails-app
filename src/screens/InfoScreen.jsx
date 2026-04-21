@@ -3,9 +3,9 @@ import SplitText from '../components/SplitText.jsx';
 import styles from './InfoScreen.module.css';
 
 const GALLERY = [
-  { id: 'atelier', title: 'Atelier зона', description: 'Хромированные поверхности, мягкий свет и индивидуальные кресла.', accent: 'rgba(76, 29, 149, 0.45)' },
-  { id: 'ritual', title: 'Ritual lab', description: 'Солярий нового поколения с системой охлаждения и бронзовым свечением.', accent: 'rgba(120, 53, 15, 0.45)' },
-  { id: 'lounge', title: 'Lounge', description: 'Приватный кофейный угол и ароматерапия перед процедурой.', accent: 'rgba(255, 255, 255, 0.15)' }
+  { id: 'atelier', title: 'Atelier зона', description: 'Хромированные поверхности, мягкий свет и индивидуальные кресла.', accent: 'rgba(212, 197, 179, 0.6)' },
+  { id: 'ritual', title: 'Ritual lab', description: 'Солярий нового поколения с системой охлаждения и бронзовым свечением.', accent: 'rgba(140, 122, 107, 0.55)' },
+  { id: 'lounge', title: 'Lounge', description: 'Приватный кофейный угол и ароматерапия перед процедурой.', accent: 'rgba(226, 214, 205, 0.55)' }
 ];
 
 const LINKS = [{ label: 'ВКонтакте', url: 'https://vk.com/natasha_premium_lab' }];
@@ -21,7 +21,8 @@ export default function InfoScreen() {
       <motion.div
         className={styles.ambientGlow}
         animate={{
-          background: 'radial-gradient(circle at 25% 25%, rgba(76, 29, 149, 0.45), transparent 60%), radial-gradient(circle at 80% 70%, rgba(120, 53, 15, 0.4), transparent 65%), #0a0a0c'
+          background:
+            'radial-gradient(circle at 25% 25%, rgba(212, 197, 179, 0.45), transparent 60%), radial-gradient(circle at 80% 70%, rgba(140, 122, 107, 0.35), transparent 65%), #F7F5F0'
         }}
         transition={{ duration: 0.8, ease: 'easeInOut' }}
       />
@@ -37,7 +38,7 @@ export default function InfoScreen() {
                 className={styles.galleryGlow}
                 style={{
                   background:
-                    `radial-gradient(circle at 30% 20%, ${card.accent}, transparent 60%), radial-gradient(circle at 75% 70%, rgba(120, 53, 15, 0.35), transparent 65%), #0b0b0e`
+                    `radial-gradient(circle at 30% 20%, ${card.accent}, transparent 60%), radial-gradient(circle at 75% 70%, rgba(247, 245, 240, 0.5), transparent 65%), #F7F5F0`
                 }}
               />
               <div className={styles.galleryMeta}>

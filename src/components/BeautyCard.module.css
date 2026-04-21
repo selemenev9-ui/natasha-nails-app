@@ -203,8 +203,8 @@
 
 .gyroHint {
   margin: 0;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
   padding: 12px 14px;
   border-radius: 12px;
   font-weight: 500;

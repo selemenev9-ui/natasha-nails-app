@@ -11,10 +11,10 @@ import { API_URL } from '../utils/config.js';
 import styles from './BookingScreen.module.css';
 
 const CATEGORY_COLORS = {
-  default: 'rgba(26, 26, 31, 0.65)',
-  nails: 'rgba(76, 29, 149, 0.65)',
-  solarium: 'rgba(120, 53, 15, 0.6)',
-  extra: 'rgba(255, 255, 255, 0.08)'
+  default: 'rgba(247, 245, 240, 0.4)',
+  nails: 'rgba(212, 197, 179, 0.55)',
+  solarium: 'rgba(140, 122, 107, 0.5)',
+  extra: 'rgba(234, 229, 222, 0.6)'
 };
 
 const CATEGORY_TEMPLATE = [
@@ -23,7 +23,7 @@ const CATEGORY_TEMPLATE = [
   { id: 'extra', title: 'Дополнительно' }
 ];
 
-export default function BookingScreen({ onDarkChange, onConfirmChange }) {
+export default function BookingScreen({ onConfirmChange }) {
   const listRef = useRef(null);
   const { triggerHaptic, user } = useVK();
   const defaultTab = CATEGORY_TEMPLATE[0]?.id ?? 'nails';
@@ -44,8 +44,7 @@ export default function BookingScreen({ onDarkChange, onConfirmChange }) {
 
   useEffect(() => {
     onConfirmChange?.(false);
-    onDarkChange?.(false);
-  }, [onConfirmChange, onDarkChange]);
+  }, [onConfirmChange]);
 
   useEffect(() => {
     let isMounted = true;
@@ -211,7 +210,7 @@ export default function BookingScreen({ onDarkChange, onConfirmChange }) {
         <motion.div
           className={styles.ambientGlow}
           animate={{
-            background: `radial-gradient(circle at 35% 35%, ${CATEGORY_COLORS[glowCategory] || CATEGORY_COLORS.default}, transparent 60%), radial-gradient(circle at 70% 65%, rgba(120, 53, 15, 0.4), transparent 65%), #1a1a1f`
+            background: `radial-gradient(circle at 35% 35%, ${CATEGORY_COLORS[glowCategory] || CATEGORY_COLORS.default}, transparent 60%), radial-gradient(circle at 70% 65%, rgba(140, 122, 107, 0.3), transparent 65%), #F7F5F0`
           }}
           transition={{ duration: 0.8, ease: 'easeInOut' }}
         />

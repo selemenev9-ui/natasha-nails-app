@@ -44,6 +44,7 @@ The content is organized as follows:
 .repomixignore
 index.html
 package.json
+PROJECT_BRAIN.md
 README.md
 scripts/fetch-portfolio.js
 src/App.jsx
@@ -78,6 +79,8 @@ src/screens/HomeScreen.jsx
 src/screens/HomeScreen.module.css
 src/screens/InfoScreen.jsx
 src/screens/InfoScreen.module.css
+src/screens/MasterScreen.jsx
+src/screens/MasterScreen.module.css
 src/screens/OnboardingScreen.jsx
 src/screens/OnboardingScreen.module.css
 src/screens/PortfolioScreen.jsx
@@ -94,14 +97,6 @@ vk-hosting-config.json
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path=".gitignore">
-node_modules
-dist
-.vite
-.DS_Store
-*.log
-</file>
 
 <file path=".repomixignore">
 # 1. Зависимости и сборка (на случай если не подхватится .gitignore)
@@ -165,7 +160,7 @@ repomix-output.xml
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vk-miniapps-deploy"
+    "deploy": "vite build && gh-pages -d dist"
   },
   "dependencies": {
     "@studio-freight/lenis": "^1.0.42",
@@ -181,92 +176,84 @@ repomix-output.xml
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "@vkontakte/vk-miniapps-deploy": "^0.1.0",
+    "gh-pages": "^6.3.0",
     "vite": "^5.4.10"
   }
 }
 </file>
 
-<file path="README.md">
-# Люмэри — VK Mini App
+<file path="PROJECT_BRAIN.md">
+# NATASHA NAILS APP — PROJECT BRAIN
 
-Мини-приложение для студии красоты Люмэри (Ростов-на-Дон).
+## Стек
+- React + Vite, VK Mini App
+- Yandex Cloud Functions (Node.js 22, ESM)
+- YDB Serverless (natasha-db)
+- Framer Motion, Three.js (rings на Home)
+- НЕТ Zustand — стейт через useState + VKContext
 
-## Tech Stack
+## API
+- URL: https://functions.yandexcloud.net/d4eb8ife6rqecrip6jp3
+- GET → { services: [...] }
+- POST → { service_id, client_id, date, totalPrice } → { ok, appointment_id }
+- Сервисный аккаунт: natasha-api-sa (ydb.editor)
+- Env: YDB_ENDPOINT, YDB_DATABASE
 
-- Vite + React
-- @vkontakte/vk-bridge — VK integration
-- @vkontakte/vk-mini-apps-router — available in deps, used as minimal internal state routing
-- Framer Motion — animations
-- Custom CSS Modules (no UI library)
+## Схема YDB
+- services: id(Utf8), category(Utf8), title(Utf8), price(Int32), duration_minutes(Int32)
+- appointments: id(Utf8), client_id(Utf8), service_id(Utf8), appointment_date(Datetime), status(Utf8), total_price(Int32)
+- clients: id(Utf8), vk_id(Utf8), first_name(Utf8), phone(Utf8), registered_at(Datetime)
 
-## Design
+## Критичные решения (не менять)
+- extractValue() парсит protobuf через JSON.parse(JSON.stringify(cell)) — без этого int32 читается как пустая строка
+- appointment_date пишется через CAST("..." AS Datetime), формат: 2026-04-21T00:12:54Z
+- total_price: CAST(N AS Int32)
+- package.json функции: оставить @yandex-cloud/nodejs-sdk, не удалять
 
-- Palette: warm off-white #FAF8F5, stone #5F5E5A, light beige #E8E4DC, border #D3D1C7, text #2C2C2A
-- Fonts: Cormorant Garamond (headings), Inter (body)
-- Mobile-first (base 375px), max-width 520px
+## Экраны
+- Home — категории + ServiceDrawer, данные хардкод (не из API)
+- Booking — услуги из API, POST запись, hasModifiers → ServiceConstructor
+- Portfolio — статичный
+- Info — статичный
+- Profile — VK user, BeautyCard, CareAccordion (советы), кнопка написать админу
 
-## Local Development
+## Навигация
+- Простой useState route в App.jsx — НЕ менять на router, сломает VK Bridge
 
-```bash
-npm install
-npm run dev
-```
+## КЛАДБИЩЕ
+- TypedData.asRows — не существует в ydb-sdk v5
+- .nativeObjects — возвращает пустой результат
+- 'textValue' in cell без JSON.parse — всегда true из-за protobuf прототипа
+- Параметризованные запросы с typeId — не работают, использовать inline CAST
+- LEFT JOIN без AS возвращает колонки с префиксом "a.id" — всегда писать явные алиасы AS
 
-Open http://localhost:5173 in your browser. VK Bridge warnings in console are expected outside VK client.
+## Текущий фокус
+- ~~Этап 1: ProfileScreen — история визитов~~ ✅
+- ~~Этап 2: MasterScreen — записи + полный CRUD услуг~~ ✅
+- ~~Этап 3: Политика конфиденциальности + онбординг~~ ✅
+- ~~Деплой GitHub Pages~~ ✅
+- VK Dev: создано приложение ID 54555974, URL вставлен ✅
+- Ожидаем иконки от дизайнера → загрузить в Оформление → подать на модерацию
+- Этап 4: Уведомления VK Notify (после модерации)
 
-## Build
+## VK App
+- App ID: 54555974
+- URL: https://selemenev9-ui.github.io/natasha-nails-app/
+- Группа: Natasha Premium Lab
+- Статус: Непроверенное, доступно по ссылке
 
-```bash
-npm run build
-```
+## Схема services (обновлено)
+- is_active (Bool) — скрыть без удаления
+- Клиентский GET возвращает только is_active=true
+- Мастерский GET: ?action=all_services — все включая скрытые
 
-Output: `dist/` — static files ready for deployment.
+## MASTER_IDS
+- ['80557585', '187729875', '123456789']
+- 123456789 — тестовый локалхост, убрать перед финальным деплоем
 
-## Deploy to VK Mini Apps
-
-1. Create an app in [VK Mini Apps Console](https://dev.vk.com/mini-apps/getting-started/quick-start) and note the **App ID**.
-2. Update `vk-hosting-config.json` with your App ID:
-   ```json
-   {
-     "app_id": 1234567
-   }
-   ```
-3. Make sure `dist/` exists: `npm run build`
-4. Run deploy:
-   ```bash
-   npm run deploy
-   ```
-   Follow prompts to authenticate with VK.
-5. Go to your app settings → Mini App → fill in the hosted URL.
-
-## Dikidi Integration
-
-Current flow opens Dikidi landing: `https://dikidi.ru/1109266`
-
-Replace with real API calls later:
-- Search files for `// TODO: replace with real Dikidi API call when token is provided`
-- Services data, available dates, time slots — all mocked
-- Update `BookingScreen.jsx` to fetch live availability once API token is available
-
-## Structure
-
-```
-src/
-  App.jsx               # Routing + VK Bridge setup
-  main.jsx              # Entry point
-  styles/global.css     # Theme variables, resets
-  components/           # TabBar
-  screens/              # Home, Booking, Portfolio, Info
-```
-
-## Navigation
-
-- Bottom tab bar (Главная, Запись, Работы, О студии)
-- Framer Motion page transitions
-
----
-
-© Люмэри — студия красоты, Ростов-на-Дон
+## Деплой
+-  задеплоено в VK (есть группа, передать Наташе позже)
+- Локально: npm run dev
 </file>
 
 <file path="scripts/fetch-portfolio.js">
@@ -396,6 +383,7 @@ import BookingScreen from './screens/BookingScreen.jsx';
 import PortfolioScreen from './screens/PortfolioScreen.jsx';
 import InfoScreen from './screens/InfoScreen.jsx';
 import ProfileScreen from './screens/ProfileScreen.jsx';
+import MasterScreen from './screens/MasterScreen.jsx';
 import OnboardingScreen from './screens/OnboardingScreen.jsx';
 import TabBar from './components/TabBar.jsx';
 import { useVK } from './contexts/VKContext.jsx';
@@ -405,7 +393,7 @@ import { useVK } from './contexts/VKContext.jsx';
  * is wired as a dependency and can be swapped in here for hash-based routing
  * when the app is published inside VK.
  */
-const ROUTES = ['home', 'booking', 'portfolio', 'info', 'profile'];
+const ROUTES = ['home', 'booking', 'portfolio', 'info', 'profile', 'master'];
 
 const pageVariants = {
   initial: { opacity: 0 },
@@ -536,6 +524,19 @@ export default function App() {
             <ProfileScreen />
           </motion.div>
         )}
+        {currentScreen === 'master' && (
+          <motion.div
+            key="master"
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            style={{ width: '100%', height: '100%' }}
+          >
+            <MasterScreen />
+          </motion.div>
+        )}
+        
       </AnimatePresence>
 
       <TabBar active={route} onChange={navigate} isHidden={isConfirm} />
@@ -1970,115 +1971,6 @@ export default function SplitText({ text, className, delay = 0 }) {
         </span>
       ))}
     </span>
-  );
-}
-</file>
-
-<file path="src/components/TabBar.jsx">
-import { motion } from 'framer-motion';
-import { haptic } from '../utils/haptic.js';
-import useMagnetic from '../hooks/useMagnetic.js';
-import styles from './TabBar.module.css';
-
-const TABS = [
-  { id: 'home', label: 'Дом', icon: IconHome },
-  { id: 'booking', label: 'Запись', icon: IconBooking },
-  { id: 'portfolio', label: 'Работы', icon: IconPortfolio },
-  { id: 'info', label: 'О нас', icon: IconInfo },
-  { id: 'profile', label: 'Кабинет', icon: IconProfile }
-];
-
-export default function TabBar({ active = 'home', onChange, isHidden = false }) {
-  return (
-    <nav
-      className={`${styles.bar} glass-panel`}
-      style={{ opacity: isHidden ? 0 : 1, pointerEvents: isHidden ? 'none' : 'auto', transition: 'opacity 0.3s ease' }}
-    >
-      {TABS.map((tab) => (
-        <MagneticTab
-          key={tab.id}
-          tab={tab}
-          isActive={active === tab.id}
-          onChange={onChange}
-        />
-      ))}
-    </nav>
-  );
-}
-
-function MagneticTab({ tab, isActive, onChange }) {
-  const { ref, onMouseMove, onMouseLeave } = useMagnetic(0.25);
-  const Icon = tab.icon;
-  return (
-    <div ref={ref} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
-      <motion.button
-        type="button"
-        whileTap={{ scale: 0.97 }}
-        className={`${styles.tab} ${isActive ? styles.active : ''}`}
-        onClick={() => {
-          haptic.light();
-          onChange?.(tab.id);
-        }}
-      >
-        <div className={styles.iconWrap}>
-          <Icon active={isActive} />
-          {isActive && (
-            <motion.span
-              layoutId="tab-dot"
-              className={styles.dot}
-              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            />
-          )}
-        </div>
-        <span className={styles.label}>{tab.label}</span>
-      </motion.button>
-    </div>
-  );
-}
-
-function IconHome({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <path d="M4 13.5 16 4l12 9.5V28a1 1 0 0 1-1 1h-6.5a.5.5 0 0 1-.5-.5V21h-8v7.5a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1Z" />
-    </svg>
-  );
-}
-
-function IconBooking({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <path d="M8 6h2l.5 2h11L22 6h2a2 2 0 0 1 2 2v18H6V8a2 2 0 0 1 2-2Zm0 7h16" />
-      <path d="M11 17h3v7h-3zM18 17h3v7h-3z" />
-    </svg>
-  );
-}
-
-function IconPortfolio({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <path d="M6 10h20v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2Z" />
-      <path d="M12 10V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3" />
-      <path d="M6 15h20" />
-    </svg>
-  );
-}
-
-function IconInfo({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <path d="M16 28a12 12 0 1 0 0-24 12 12 0 0 0 0 24Z" />
-      <path d="M16 9.5v.2" />
-      <path d="M16 14v8" />
-    </svg>
-  );
-}
-
-function IconProfile({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <circle cx="16" cy="11" r="4.2" />
-      <path d="M7.5 26c0-4.8 3.8-8 8.5-8s8.5 3.2 8.5 8" />
-    </svg>
   );
 }
 </file>
@@ -3713,6 +3605,33 @@ export default function InfoScreen() {
             </button>
           ))}
         </div>
+
+        <div className={`${styles.card} glass-panel`}>
+          <p className={styles.cardLabel}>Политика конфиденциальности</p>
+          <p className={styles.cardValue}>
+            Настоящая политика описывает, как Natasha Beauty Lab собирает, использует и защищает персональные данные пользователей приложения.
+          </p>
+          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Какие данные мы собираем</p>
+          <p className={styles.cardValue}>
+            Имя и идентификатор ВКонтакте — для персонализации и истории визитов. Дата и время записи — для управления расписанием. Мы не собираем номера карт, пароли и геолокацию.
+          </p>
+          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Как мы используем данные</p>
+          <p className={styles.cardValue}>
+            Данные используются исключительно для записи к мастеру, отправки напоминаний и ведения истории визитов. Данные не передаются третьим лицам и не используются в рекламных целях.
+          </p>
+          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Хранение данных</p>
+          <p className={styles.cardValue}>
+            Данные хранятся на серверах Yandex Cloud на территории Российской Федерации в соответствии с требованиями ФЗ-152 «О персональных данных».
+          </p>
+          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Ваши права</p>
+          <p className={styles.cardValue}>
+            Вы можете запросить удаление своих данных, написав администратору через ВКонтакте. Данные будут удалены в течение 3 рабочих дней.
+          </p>
+          <p className={styles.cardValue} style={{ marginTop: 12, fontSize: 11, opacity: 0.5 }}>
+            Последнее обновление: апрель 2026 г.
+          </p>
+        </div>
+
       </div>
     </div>
   );
@@ -3877,6 +3796,244 @@ export default function InfoScreen() {
 }
 </file>
 
+<file path="src/screens/MasterScreen.module.css">
+.master {
+  position: relative;
+  min-height: 100dvh;
+  padding-bottom: 80px;
+  overflow-y: auto;
+}
+
+.ambientGlow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  padding: 24px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kicker {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--ink-60);
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink-100);
+  margin: 0;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tab {
+  padding: 12px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  color: var(--ink-60);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.tabActive {
+  color: var(--ink-100);
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.groupLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-60);
+  margin: 8px 0 4px;
+}
+
+.card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardHighlight {
+  border-left: 3px solid rgba(76, 29, 149, 0.8);
+}
+
+.cardMuted {
+  opacity: 0.6;
+}
+
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-100);
+  margin: 0;
+}
+
+.cardPrice {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-100);
+  white-space: nowrap;
+  margin: 0;
+}
+
+.cardSub {
+  font-size: 12px;
+  color: var(--ink-60);
+  margin: 0;
+}
+
+.editRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.editInput {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ink-100);
+  font-size: 14px;
+}
+
+.btnEdit {
+  font-size: 12px;
+  color: var(--ink-60);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 2px;
+  text-align: left;
+}
+
+.btnSave {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(76, 29, 149, 0.7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnCancel {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-60);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.empty {
+  text-align: center;
+  color: var(--ink-60);
+  font-size: 14px;
+  padding: 30px 0;
+}
+
+.denied {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: var(--ink-60);
+}
+
+.actionsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.btnAdd {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px dashed rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.04);
+  color: var(--ink-60);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnDelete {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(220,38,38,0.7);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnDeleteSoft {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  color: var(--ink-60);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.hiddenBadge {
+  font-size: 10px;
+  background: rgba(255,255,255,0.1);
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  color: var(--ink-60);
+}
+</file>
+
 <file path="src/screens/OnboardingScreen.jsx">
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -3899,30 +4056,21 @@ const SLIDES = [
 
 const contentVariants = {
   initial: { opacity: 0, y: 18, filter: 'blur(4px)' },
-  animate: {
-    opacity: 1,
-    y: 0,
-    filter: 'blur(0px)',
-    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] }
-  },
-  exit: {
-    opacity: 0,
-    y: -12,
-    filter: 'blur(3px)',
-    transition: { duration: 0.25, ease: [0.4, 0, 1, 1] }
-  }
+  animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } },
+  exit: { opacity: 0, y: -12, filter: 'blur(3px)', transition: { duration: 0.25, ease: [0.4, 0, 1, 1] } }
 };
 
 export default function OnboardingScreen({ onComplete }) {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [agreed, setAgreed] = useState(false);
   const isLastSlide = currentSlide === SLIDES.length - 1;
 
   const handleNext = () => {
     if (isLastSlide) {
+      if (!agreed) return;
       onComplete?.();
       return;
     }
-
     setCurrentSlide((prev) => Math.min(prev + 1, SLIDES.length - 1));
   };
 
@@ -3949,15 +4097,38 @@ export default function OnboardingScreen({ onComplete }) {
       <div className={styles.footer}>
         <div className={styles.dots}>
           {SLIDES.map((_, index) => (
-            <span
-              key={index}
+            <span key={index}
               className={`${styles.dot} ${index === currentSlide ? styles.dotActive : ''}`}
-              aria-hidden="true"
-            />
+              aria-hidden="true" />
           ))}
         </div>
 
-        <button type="button" className="btn-ink glass-panel" onClick={handleNext}>
+        {isLastSlide && (
+          <motion.label
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={styles.consentRow}
+          >
+            <input
+              type="checkbox"
+              className={styles.consentCheck}
+              checked={agreed}
+              onChange={e => setAgreed(e.target.checked)}
+            />
+            <span className={styles.consentText}>
+              Я согласен(а) с{' '}
+              <span className={styles.consentLink}>политикой конфиденциальности</span>
+              {' '}и обработкой персональных данных в соответствии с ФЗ-152
+            </span>
+          </motion.label>
+        )}
+
+        <button
+          type="button"
+          className="btn-ink glass-panel"
+          onClick={handleNext}
+          style={{ opacity: isLastSlide && !agreed ? 0.4 : 1, transition: 'opacity 0.2s' }}
+        >
           {isLastSlide ? 'Начать' : 'Далее'}
         </button>
       </div>
@@ -4076,6 +4247,35 @@ export default function OnboardingScreen({ onComplete }) {
 .footer :global(.btn-ink) {
   min-width: 170px;
   color: var(--ink) !important;
+}
+
+.consentRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.consentCheck {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin-top: 2px;
+  accent-color: rgba(76, 29, 149, 0.9);
+  cursor: pointer;
+}
+
+.consentText {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-60);
+}
+
+.consentLink {
+  color: var(--ink-100);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 </file>
 
@@ -4332,7 +4532,81 @@ import { useVK } from '../contexts/VKContext.jsx';
 import BeautyCard from '../components/BeautyCard.jsx';
 import CareAccordion from '../components/CareAccordion.jsx';
 import { getDailyTips } from '../data/careHub';
+import { API_URL } from '../utils/config.js';
 import styles from './ProfileScreen.module.css';
+
+function formatDate(timestamp) {
+  if (!timestamp) return '—';
+  // YDB Datetime возвращает секунды от эпохи
+  const ms = timestamp > 1e10 ? timestamp : timestamp * 1000;
+  return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function HistorySection({ clientId }) {
+  const [appointments, setAppointments] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clientId) { setLoading(false); return; }
+    fetch(`${API_URL}?action=history&client_id=${clientId}`)
+      .then((r) => r.json())
+      .then((data) => setAppointments(data.appointments || []))
+      .catch(() => setAppointments([]))
+      .finally(() => setLoading(false));
+  }, [clientId]);
+
+  if (loading) return <p className={styles.historyEmpty}>Загрузка истории…</p>;
+  if (!clientId) return <p className={styles.historyEmpty}>Войдите через VK чтобы видеть историю</p>;
+  if (!appointments?.length) return <p className={styles.historyEmpty}>Визитов пока нет — самое время записаться 💅</p>;
+
+  const totalSpent = appointments.reduce((sum, a) => sum + (a.total_price || 0), 0);
+  const now = Date.now() / 1000;
+  const upcoming = appointments.find((a) => a.appointment_date > now);
+  const past = appointments.filter((a) => a.appointment_date <= now);
+
+  return (
+    <div className={styles.historySection}>
+      {/* Статистика */}
+      <div className={styles.statsRow}>
+        <div className={`${styles.statCard} glass-panel`}>
+          <span className={styles.statValue}>{appointments.length}</span>
+          <span className={styles.statLabel}>визитов</span>
+        </div>
+        <div className={`${styles.statCard} glass-panel`}>
+          <span className={styles.statValue}>{totalSpent.toLocaleString('ru-RU')} ₽</span>
+          <span className={styles.statLabel}>потрачено</span>
+        </div>
+      </div>
+
+      {/* Следующий визит */}
+      {upcoming && (
+        <div className={`${styles.upcomingCard} glass-panel`}>
+          <p className={styles.upcomingLabel}>⏰ Следующий визит</p>
+          <p className={styles.upcomingDate}>{formatDate(upcoming.appointment_date)}</p>
+          <p className={styles.upcomingService}>{upcoming.service_id}</p>
+        </div>
+      )}
+
+      {/* История */}
+      {past.length > 0 && (
+        <div className={styles.historyList}>
+          <p className={styles.sectionLabel}>История визитов</p>
+          {past.map((a) => (
+            <div key={a.id} className={`${styles.historyCard} glass-panel`}>
+              <div className={styles.historyCardLeft}>
+                <p className={styles.historyService}>{a.title || a.service_id}</p>
+                <p className={styles.historyDate}>{formatDate(a.appointment_date)}</p>
+              </div>
+              {a.total_price > 0 && (
+                <p className={styles.historyPrice}>{a.total_price.toLocaleString('ru-RU')} ₽</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ProfileScreen() {
   const { user, cardTheme, toggleTheme, seenTips, isBridgeLoading, isVKEnv } = useVK();
@@ -4342,45 +4616,37 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (isBridgeLoading) return;
-
     const { tips, newSeenIds } = getDailyTips(3, seenTips);
     setDailyMix(tips);
-
     if (newSeenIds.length > seenTips.length && isVKEnv) {
-      bridge
-        .send('VKWebAppStorageSet', {
-          key: 'seen_tips',
-          value: JSON.stringify(newSeenIds)
-        })
-        .catch((error) => {
-          console.error('VK Storage seen_tips update failed:', error);
-        });
+      bridge.send('VKWebAppStorageSet', { key: 'seen_tips', value: JSON.stringify(newSeenIds) }).catch(() => {});
     }
   }, [isBridgeLoading, isVKEnv, seenTips]);
 
-  const openAdmin = () => {
-    window.open('https://vk.me/natasha_premium_lab', '_blank');
-  };
+  const openAdmin = () => window.open('https://vk.me/natasha_premium_lab', '_blank');
 
   return (
     <div className={styles.profile}>
       <motion.div
         className={styles.ambientGlow}
-        animate={{
-          background: 'radial-gradient(circle at 30% 20%, rgba(76, 29, 149, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(120, 53, 15, 0.4), transparent 65%), #0a0a0c'
-        }}
+        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(76, 29, 149, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(120, 53, 15, 0.4), transparent 65%), #0a0a0c' }}
         transition={{ duration: 0.8, ease: 'easeInOut' }}
       />
       <div className={styles.inner}>
         <header className={styles.header}>
           <h1 className={styles.title}>Рады видеть тебя, {firstName}</h1>
-          {avatar ? (
-            <img className={styles.avatar} src={avatar} alt={firstName} />
-          ) : (
-            <div className={styles.avatarPlaceholder} aria-hidden="true" />
-          )}
+          {avatar
+            ? <img className={styles.avatar} src={avatar} alt={firstName} />
+            : <div className={styles.avatarPlaceholder} aria-hidden="true" />}
         </header>
 
+        {/* История визитов */}
+        <section className={styles.beautyIdSection}>
+          <p className={styles.sectionLabel}>Мои визиты</p>
+          <HistorySection clientId={user?.id ? String(user.id) : null} />
+        </section>
+
+        {/* Beauty ID */}
         <section className={styles.beautyIdSection}>
           <p className={styles.sectionLabel}>Beauty ID</p>
           <button className={`${styles.themeToggle} glass-panel`} onClick={toggleTheme} type="button">
@@ -4389,7 +4655,6 @@ export default function ProfileScreen() {
           <div className={`${styles.beautyIdContainer} glass-panel`}>
             <BeautyCard firstName={user?.first_name} vkId={user?.id} theme={cardTheme} />
           </div>
-
           <div className={`${styles.careLibrary} glass-panel`}>
             <h2 className={styles.careTitle}>Beauty Mix на сегодня</h2>
             <CareAccordion data={dailyMix} />
@@ -4397,9 +4662,7 @@ export default function ProfileScreen() {
         </section>
 
         <footer className={styles.footer}>
-          <button className="btn-ink glass-panel" onClick={openAdmin}>
-            Написать администратору
-          </button>
+          <button className="btn-ink glass-panel" onClick={openAdmin}>Написать администратору</button>
         </footer>
       </div>
     </div>
@@ -4523,6 +4786,95 @@ export default function ProfileScreen() {
 
 .footer :global(.btn-ink) {
   color: var(--ink) !important;
+}
+
+.historySection { display: flex; flex-direction: column; gap: 12px; }
+
+.statsRow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.statCard {
+  padding: 14px;
+  border-radius: 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink-100);
+}
+
+.statLabel {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-60);
+}
+
+.upcomingCard {
+  padding: 16px;
+  border-radius: 14px;
+  border-left: 3px solid rgba(76, 29, 149, 0.8);
+}
+
+.upcomingLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-60);
+  margin-bottom: 6px;
+}
+
+.upcomingDate {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-100);
+}
+
+.upcomingService {
+  font-size: 13px;
+  color: var(--ink-60);
+  margin-top: 4px;
+}
+
+.historyList { display: flex; flex-direction: column; gap: 8px; }
+
+.historyCard {
+  padding: 14px 16px;
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.historyCardLeft { display: flex; flex-direction: column; gap: 4px; }
+
+.historyService {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-100);
+}
+
+.historyDate {
+  font-size: 12px;
+  color: var(--ink-60);
+}
+
+.historyPrice {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-100);
+  white-space: nowrap;
+}
+
+.historyEmpty {
+  font-size: 14px;
+  color: var(--ink-60);
+  text-align: center;
+  padding: 20px 0;
 }
 </file>
 
@@ -4792,6 +5144,428 @@ export default defineConfig({
   "endpoint_main": "index.html",
   "endpoint_mobile": "index.html",
   "app_id": 0
+}
+</file>
+
+<file path=".gitignore">
+node_modules
+dist
+.vite
+.DS_Store
+*.log
+repomix-output.xml
+</file>
+
+<file path="README.md">
+# Natasha Nails App — VK Mini App
+
+Приложение для записи к мастеру ногтевого сервиса и солярия.
+
+## Стек
+- React + Vite
+- VK Bridge
+- Framer Motion
+- Yandex Cloud Functions + YDB Serverless
+
+## Локальная разработка
+npm install
+npm run dev
+
+## Деплой
+npm run deploy
+</file>
+
+<file path="src/components/TabBar.jsx">
+import { motion } from 'framer-motion';
+import { haptic } from '../utils/haptic.js';
+import useMagnetic from '../hooks/useMagnetic.js';
+import { useVK } from '../contexts/VKContext.jsx';
+import styles from './TabBar.module.css';
+
+const MASTER_IDS = ['80557585', '187729875'];
+
+const BASE_TABS = [
+  { id: 'home',      label: 'Дом',     icon: IconHome },
+  { id: 'booking',   label: 'Запись',  icon: IconBooking },
+  { id: 'portfolio', label: 'Работы',  icon: IconPortfolio },
+  { id: 'info',      label: 'О нас',   icon: IconInfo },
+  { id: 'profile',   label: 'Кабинет', icon: IconProfile }
+];
+
+const MASTER_TAB = { id: 'master', label: 'Мастер', icon: IconMaster };
+
+export default function TabBar({ active = 'home', onChange, isHidden = false }) {
+  const { user } = useVK();
+  const isMaster = MASTER_IDS.includes(String(user?.id));
+  const tabs = isMaster ? [...BASE_TABS, MASTER_TAB] : BASE_TABS;
+
+  return (
+    <nav
+      className={`${styles.bar} glass-panel`}
+      style={{ opacity: isHidden ? 0 : 1, pointerEvents: isHidden ? 'none' : 'auto', transition: 'opacity 0.3s ease' }}
+    >
+      {tabs.map((tab) => (
+        <MagneticTab key={tab.id} tab={tab} isActive={active === tab.id} onChange={onChange} />
+      ))}
+    </nav>
+  );
+}
+
+function MagneticTab({ tab, isActive, onChange }) {
+  const { ref, onMouseMove, onMouseLeave } = useMagnetic(0.25);
+  const Icon = tab.icon;
+  return (
+    <div ref={ref} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.97 }}
+        className={`${styles.tab} ${isActive ? styles.active : ''}`}
+        onClick={() => { haptic.light(); onChange?.(tab.id); }}
+      >
+        <div className={styles.iconWrap}>
+          <Icon active={isActive} />
+          {isActive && (
+            <motion.span layoutId="tab-dot" className={styles.dot}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }} />
+          )}
+        </div>
+        <span className={styles.label}>{tab.label}</span>
+      </motion.button>
+    </div>
+  );
+}
+
+function IconHome({ active }) {
+  return (
+    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
+      <path d="M4 13.5 16 4l12 9.5V28a1 1 0 0 1-1 1h-6.5a.5.5 0 0 1-.5-.5V21h-8v7.5a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1Z" />
+    </svg>
+  );
+}
+
+function IconBooking({ active }) {
+  return (
+    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
+      <path d="M8 6h2l.5 2h11L22 6h2a2 2 0 0 1 2 2v18H6V8a2 2 0 0 1 2-2Zm0 7h16" />
+      <path d="M11 17h3v7h-3zM18 17h3v7h-3z" />
+    </svg>
+  );
+}
+
+function IconPortfolio({ active }) {
+  return (
+    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
+      <path d="M6 10h20v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2Z" />
+      <path d="M12 10V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3" />
+      <path d="M6 15h20" />
+    </svg>
+  );
+}
+
+function IconInfo({ active }) {
+  return (
+    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
+      <path d="M16 28a12 12 0 1 0 0-24 12 12 0 0 0 0 24Z" />
+      <path d="M16 9.5v.2M16 14v8" />
+    </svg>
+  );
+}
+
+function IconProfile({ active }) {
+  return (
+    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
+      <circle cx="16" cy="11" r="4.2" />
+      <path d="M7.5 26c0-4.8 3.8-8 8.5-8s8.5 3.2 8.5 8" />
+    </svg>
+  );
+}
+
+function IconMaster({ active }) {
+  return (
+    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
+      <path d="M16 4l2.5 7.5H26l-6.5 4.7 2.5 7.5L16 19l-6 4.7 2.5-7.5L6 11.5h7.5Z" />
+    </svg>
+  );
+}
+</file>
+
+<file path="src/screens/MasterScreen.jsx">
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useVK } from '../contexts/VKContext.jsx';
+import { API_URL } from '../utils/config.js';
+import styles from './MasterScreen.module.css';
+
+const MASTER_IDS = ['80557585', '187729875'];
+const CATEGORIES = [
+  { id: 'nails', label: 'Маникюр & Педикюр' },
+  { id: 'solarium', label: 'Солярий' },
+  { id: 'extra', label: 'Дополнительно' }
+];
+
+function isMaster(userId) {
+  return MASTER_IDS.includes(String(userId));
+}
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  const ms = ts > 1e10 ? ts : ts * 1000;
+  return new Date(ms).toLocaleString('ru-RU', {
+    day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
+  });
+}
+
+// ─── ЗАПИСИ ──────────────────────────────────────────────────────────────────
+function AppointmentsTab() {
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_URL}?action=all_appointments`)
+      .then(r => r.json())
+      .then(d => setAppointments(d.appointments || []))
+      .catch(() => setAppointments([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className={styles.empty}>Загрузка…</p>;
+  if (!appointments.length) return <p className={styles.empty}>Записей пока нет</p>;
+
+  const now = Date.now() / 1000;
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const todayTs = todayStart.getTime() / 1000;
+  const tomorrowTs = todayTs + 86400;
+
+  const todayList  = appointments.filter(a => a.appointment_date >= todayTs && a.appointment_date < tomorrowTs);
+  const upcoming   = appointments.filter(a => a.appointment_date >= tomorrowTs);
+  const past       = appointments.filter(a => a.appointment_date < todayTs);
+
+  return (
+    <div className={styles.tabContent}>
+      {todayList.length > 0 && <>
+        <p className={styles.groupLabel}>📅 Сегодня</p>
+        {todayList.map(a => <AppCard key={a.id} a={a} highlight />)}
+      </>}
+      {upcoming.length > 0 && <>
+        <p className={styles.groupLabel}>Предстоящие</p>
+        {upcoming.map(a => <AppCard key={a.id} a={a} />)}
+      </>}
+      {past.length > 0 && <>
+        <p className={styles.groupLabel}>Прошедшие</p>
+        {past.map(a => <AppCard key={a.id} a={a} muted />)}
+      </>}
+    </div>
+  );
+}
+
+function AppCard({ a, highlight, muted }) {
+  return (
+    <div className={`${styles.card} glass-panel ${highlight ? styles.cardHighlight : ''} ${muted ? styles.cardMuted : ''}`}>
+      <div className={styles.cardRow}>
+        <p className={styles.cardTitle}>{a.title || a.service_id}</p>
+        {a.total_price > 0 && <p className={styles.cardPrice}>{a.total_price.toLocaleString('ru-RU')} ₽</p>}
+      </div>
+      <p className={styles.cardSub}>🕐 {formatDate(a.appointment_date)}</p>
+      <p className={styles.cardSub}>👤 {a.client_id}</p>
+    </div>
+  );
+}
+
+// ─── УСЛУГИ ───────────────────────────────────────────────────────────────────
+function ServicesTab() {
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editId, setEditId] = useState(null);
+  const [editData, setEditData] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newService, setNewService] = useState({ title: '', category: 'nails', price: '', duration_minutes: '' });
+  const [adding, setAdding] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+
+  const load = () => {
+    setLoading(true);
+    fetch(`${API_URL}?action=all_services`)
+      .then(r => r.json())
+      .then(d => setServices(d.services || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const startEdit = (s) => {
+    setEditId(s.id);
+    setEditData({ title: s.title, price: s.basePrice, duration_minutes: s.durationMinutes });
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_service', id: editId, ...editData })
+      });
+      setEditId(null);
+      load();
+    } catch(e) {}
+    setSaving(false);
+  };
+
+  const toggleActive = async (s) => {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_service', id: s.id, is_active: !s.isActive })
+    });
+    load();
+  };
+
+  const confirmDelete = async (id) => {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete_service', id })
+    });
+    setDeleteId(null);
+    load();
+  };
+
+  const addService = async () => {
+    if (!newService.title || !newService.category) return;
+    setAdding(true);
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_service', ...newService })
+      });
+      setShowAdd(false);
+      setNewService({ title: '', category: 'nails', price: '', duration_minutes: '' });
+      load();
+    } catch(e) {}
+    setAdding(false);
+  };
+
+  if (loading) return <p className={styles.empty}>Загрузка…</p>;
+
+  return (
+    <div className={styles.tabContent}>
+
+      {/* Кнопка добавить */}
+      <button className={styles.btnAdd} onClick={() => setShowAdd(v => !v)}>
+        {showAdd ? '✕ Отмена' : '+ Добавить услугу'}
+      </button>
+
+      {/* Форма добавления */}
+      <AnimatePresence>
+        {showAdd && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className={`${styles.card} glass-panel`}
+          >
+            <p className={styles.cardTitle}>Новая услуга</p>
+            <input className={styles.editInput} placeholder="Название" value={newService.title}
+              onChange={e => setNewService(v => ({ ...v, title: e.target.value }))} />
+            <select className={styles.editInput} value={newService.category}
+              onChange={e => setNewService(v => ({ ...v, category: e.target.value }))}>
+              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+            <div className={styles.editRow}>
+              <input className={styles.editInput} placeholder="Цена ₽" type="number" value={newService.price}
+                onChange={e => setNewService(v => ({ ...v, price: e.target.value }))} />
+              <input className={styles.editInput} placeholder="Минут" type="number" value={newService.duration_minutes}
+                onChange={e => setNewService(v => ({ ...v, duration_minutes: e.target.value }))} />
+            </div>
+            <button className={styles.btnSave} disabled={adding} onClick={addService}>
+              {adding ? 'Сохранение…' : 'Добавить'}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Список услуг */}
+      {services.map(s => (
+        <div key={s.id} className={`${styles.card} glass-panel ${!s.isActive ? styles.cardMuted : ''}`}>
+          {editId === s.id ? (
+            <>
+              <input className={styles.editInput} value={editData.title}
+                onChange={e => setEditData(v => ({ ...v, title: e.target.value }))} />
+              <div className={styles.editRow}>
+                <input className={styles.editInput} type="number" placeholder="Цена" value={editData.price}
+                  onChange={e => setEditData(v => ({ ...v, price: e.target.value }))} />
+                <input className={styles.editInput} type="number" placeholder="Минут" value={editData.duration_minutes}
+                  onChange={e => setEditData(v => ({ ...v, duration_minutes: e.target.value }))} />
+              </div>
+              <div className={styles.editRow}>
+                <button className={styles.btnSave} disabled={saving} onClick={saveEdit}>
+                  {saving ? '…' : 'Сохранить'}
+                </button>
+                <button className={styles.btnCancel} onClick={() => setEditId(null)}>Отмена</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={styles.cardRow}>
+                <p className={styles.cardTitle}>{s.title} {!s.isActive && <span className={styles.hiddenBadge}>скрыта</span>}</p>
+                <p className={styles.cardPrice}>{s.price}</p>
+              </div>
+              <p className={styles.cardSub}>{s.duration} · {s.category}</p>
+              <div className={styles.actionsRow}>
+                <button className={styles.btnEdit} onClick={() => startEdit(s)}>✏️ Изменить</button>
+                <button className={styles.btnEdit} onClick={() => toggleActive(s)}>
+                  {s.isActive ? '👁 Скрыть' : '👁 Показать'}
+                </button>
+                {deleteId === s.id ? (
+                  <>
+                    <button className={styles.btnDelete} onClick={() => confirmDelete(s.id)}>Удалить?</button>
+                    <button className={styles.btnCancel} onClick={() => setDeleteId(null)}>Нет</button>
+                  </>
+                ) : (
+                  <button className={styles.btnDeleteSoft} onClick={() => setDeleteId(s.id)}>🗑</button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+export default function MasterScreen() {
+  const { user } = useVK();
+  const [tab, setTab] = useState('appointments');
+
+  if (!isMaster(user?.id)) {
+    return <div className={styles.denied}><p>🔒 Доступ только для мастера</p></div>;
+  }
+
+  return (
+    <div className={styles.master}>
+      <motion.div className={styles.ambientGlow}
+        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(76,29,149,0.45), transparent 60%), #0a0a0c' }}
+        transition={{ duration: 0.8 }} />
+      <div className={styles.inner}>
+        <header className={styles.header}>
+          <span className={styles.kicker}>МАСТЕР</span>
+          <h1 className={styles.title}>Панель управления</h1>
+        </header>
+        <div className={styles.tabs}>
+          <button className={`${styles.tab} ${tab === 'appointments' ? styles.tabActive : ''} glass-panel`}
+            onClick={() => setTab('appointments')}>Записи</button>
+          <button className={`${styles.tab} ${tab === 'services' ? styles.tabActive : ''} glass-panel`}
+            onClick={() => setTab('services')}>Услуги</button>
+        </div>
+        {tab === 'appointments' && <AppointmentsTab />}
+        {tab === 'services' && <ServicesTab />}
+      </div>
+    </div>
+  );
 }
 </file>
 

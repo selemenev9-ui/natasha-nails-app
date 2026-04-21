@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import HomeScreen from './screens/HomeScreen.jsx';
 import BookingScreen from './screens/BookingScreen.jsx';
-import PortfolioScreen from './screens/PortfolioScreen.jsx';
 import InfoScreen from './screens/InfoScreen.jsx';
 import ProfileScreen from './screens/ProfileScreen.jsx';
 import MasterScreen from './screens/MasterScreen.jsx';
@@ -16,7 +15,7 @@ import { useVK } from './contexts/VKContext.jsx';
  * is wired as a dependency and can be swapped in here for hash-based routing
  * when the app is published inside VK.
  */
-const ROUTES = ['home', 'booking', 'portfolio', 'info', 'profile', 'master'];
+const ROUTES = ['home', 'booking', 'info', 'profile', 'master'];
 
 const pageVariants = {
   initial: { opacity: 0 },
@@ -51,13 +50,8 @@ function Loader() {
 export default function App() {
   const { isBridgeLoading, isFirstVisit, completeOnboarding } = useVK();
   const [route, setRoute] = useState('home');
-  const [isDark, setIsDark] = useState(false);
   const [isConfirm, setIsConfirm] = useState(false);
   const currentScreen = route;
-
-  useEffect(() => {
-    document.body.style.background = isDark ? '#111820' : '#F5F0E8';
-  }, [isDark]);
 
   const navigate = (next) => {
     if (!ROUTES.includes(next)) return;
@@ -65,7 +59,7 @@ export default function App() {
   };
   if (isBridgeLoading) {
     return (
-      <div className="app-shell" style={{ background: isDark ? '#111820' : undefined }}>
+      <div className="app-shell">
         <Loader />
       </div>
     );
@@ -73,14 +67,14 @@ export default function App() {
 
   if (isFirstVisit) {
     return (
-      <div className="app-shell" style={{ background: isDark ? '#111820' : undefined }}>
+      <div className="app-shell">
         <OnboardingScreen onComplete={completeOnboarding} />
       </div>
     );
   }
 
   return (
-    <div className="app-shell" style={{ background: isDark ? '#111820' : undefined }}>
+    <div className="app-shell">
       <div className="material" />
       <AnimatePresence mode="wait">
         {currentScreen === 'home' && (
@@ -105,20 +99,7 @@ export default function App() {
             exit="exit"
             style={{ width: '100%', height: '100%' }}
           >
-            <BookingScreen onNavigate={navigate} onDarkChange={setIsDark} onConfirmChange={setIsConfirm} />
-          </motion.div>
-        )}
-
-        {currentScreen === 'portfolio' && (
-          <motion.div
-            key={currentScreen}
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <PortfolioScreen />
+            <BookingScreen onNavigate={navigate} onConfirmChange={setIsConfirm} />
           </motion.div>
         )}
 

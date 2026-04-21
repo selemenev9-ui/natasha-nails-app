@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import styles from './BeautyCard.module.css';
 
 const MAX_TILT = 10;
@@ -21,6 +22,7 @@ export default function BeautyCard({ firstName, vkId, theme = 'light' }) {
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
   const [isReturning, setIsReturning] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
   const needsPermission = typeof window !== 'undefined' && typeof window.DeviceOrientationEvent !== 'undefined' && typeof window.DeviceOrientationEvent.requestPermission === 'function';
   const [gyroReady, setGyroReady] = useState(!needsPermission);
   const [gyroDenied, setGyroDenied] = useState(false);
@@ -177,36 +179,86 @@ export default function BeautyCard({ firstName, vkId, theme = 'light' }) {
   const displayVkId = vkId ?? '000000000';
 
   return (
-    <div className={styles.perspectiveWrap}>
-      <article
-        ref={cardRef}
+    <div
+      ref={cardRef}
+      className={styles.perspectiveWrap}
+      style={transformStyle}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onPointerDown={requestGyroAccess}
+      onClick={() => setIsFlipped((prev) => !prev)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setIsFlipped((prev) => !prev);
+        }
+      }}
+    >
+      <motion.article
         className={`${styles.card} ${theme === 'dark' ? styles.dark : styles.light}`}
-        style={transformStyle}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onPointerDown={requestGyroAccess}
+        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        transition={{ type: 'spring', stiffness: 60, damping: 15, mass: 1.5 }}
+        style={{ transformStyle: 'preserve-3d' }}
       >
-        <div className={`${styles.brand} ${styles.levitate}`}>NATASHA LAB</div>
-        <div className={`${styles.name} ${styles.levitate}`}>{displayName}</div>
+        <div className={styles.frontFace}>
+          <div className={`${styles.brand} ${styles.levitate}`}>NATASHA LAB</div>
+          <div className={`${styles.name} ${styles.levitate}`}>{displayName}</div>
 
-        <div className={styles.bottomRow}>
-          <span className={`${styles.status} ${styles.levitate}`}>BEAUTY ID</span>
-          <span className={`${styles.vkId} ${styles.levitate}`}>{displayVkId}</span>
+          <div className={styles.bottomRow}>
+            <span className={`${styles.status} ${styles.levitate}`}>BEAUTY ID</span>
+            <span className={`${styles.vkId} ${styles.levitate}`}>{displayVkId}</span>
+          </div>
+
+          <div className={styles.glare} style={glareStyle} />
+          <div className={styles.rim} style={rimStyle} />
+          <div className={styles.grain} />
+          <div className={styles.sweep} />
+
+          <AnimatePresence>
+            {needsPermission && !gyroReady && !gyroDenied && (
+              <motion.button
+                key="gyro-prompt"
+                type="button"
+                className={styles.gyroPrompt}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  requestGyroAccess();
+                }}
+              >
+                Включить гироскоп
+              </motion.button>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {gyroDenied && (
+              <motion.p
+                key="gyro-hint"
+                className={styles.gyroHint}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                Разрешите «Движение и ориентацию» в настройках браузера
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className={styles.glare} style={glareStyle} />
-        <div className={styles.rim} style={rimStyle} />
-        <div className={styles.grain} />
-        <div className={styles.sweep} />
-        {needsPermission && !gyroReady && !gyroDenied && (
-          <button type="button" className={styles.gyroPrompt} onClick={requestGyroAccess}>
-            Включить гироскоп
-          </button>
-        )}
-        {gyroDenied && (
-          <p className={styles.gyroHint}>Разрешите «Движение и ориентацию» в настройках браузера</p>
-        )}
-      </article>
+        <div className={styles.backFace} style={{ transform: 'rotateY(180deg) translateZ(1px)' }}>
+          <div className={styles.magneticStrip} />
+          <div className={styles.backContent}>
+            <p>PRIVATE MEMBER</p>
+            <p className={styles.vkId}>{displayVkId}</p>
+          </div>
+        </div>
+      </motion.article>
     </div>
   );
 }

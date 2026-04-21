@@ -1,12 +1,4 @@
-import { motion } from 'framer-motion';
-import SplitText from '../components/SplitText.jsx';
 import styles from './InfoScreen.module.css';
-
-const GALLERY = [
-  { id: 'atelier', title: 'Atelier зона', description: 'Хромированные поверхности, мягкий свет и индивидуальные кресла.', accent: 'rgba(212, 197, 179, 0.6)' },
-  { id: 'ritual', title: 'Ritual lab', description: 'Солярий нового поколения с системой охлаждения и бронзовым свечением.', accent: 'rgba(140, 122, 107, 0.55)' },
-  { id: 'lounge', title: 'Lounge', description: 'Приватный кофейный угол и ароматерапия перед процедурой.', accent: 'rgba(226, 214, 205, 0.55)' }
-];
 
 const LINKS = [{ label: 'ВКонтакте', url: 'https://vk.com/natasha_premium_lab' }];
 
@@ -18,45 +10,17 @@ export default function InfoScreen() {
 
   return (
     <div className={styles.info}>
-      <motion.div
-        className={styles.ambientGlow}
-        animate={{
-          background:
-            'radial-gradient(circle at 25% 25%, rgba(212, 197, 179, 0.45), transparent 60%), radial-gradient(circle at 80% 70%, rgba(140, 122, 107, 0.35), transparent 65%), #F7F5F0'
-        }}
-        transition={{ duration: 0.8, ease: 'easeInOut' }}
-      />
       <div className={styles.inner}>
-        <div className={styles.heading}>
-          <SplitText text="О Natasha Beauty Lab" className={styles.title} delay={0.1} />
-        </div>
+        <h1 className={styles.title}>Studio</h1>
 
-        <div className={styles.galleryRow}>
-          {GALLERY.map((card) => (
-            <div key={card.id} className={`${styles.galleryCard} glass-panel`}>
-              <div
-                className={styles.galleryGlow}
-                style={{
-                  background:
-                    `radial-gradient(circle at 30% 20%, ${card.accent}, transparent 60%), radial-gradient(circle at 75% 70%, rgba(247, 245, 240, 0.5), transparent 65%), #F7F5F0`
-                }}
-              />
-              <div className={styles.galleryMeta}>
-                <p>{card.title}</p>
-                <span>{card.description}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className={`${styles.card} glass-panel`}>
+        <div className={styles.card}>
           <p className={styles.cardLabel}>Контакты</p>
           <p className={styles.cardValue}>Адрес: (В процессе добавления)</p>
           <p className={styles.cardValue}>пн–вс · 10:00—20:00</p>
           <a href="tel:+70000000000" className={styles.cardLink}>+7 (000) 000-00-00</a>
         </div>
 
-        <div className={`${styles.card} glass-panel`}>
+        <div className={styles.card}>
           <p className={styles.cardLabel}>О мастере</p>
           <p className={styles.quote}>
             Информация о мастере обновляется...
@@ -68,7 +32,7 @@ export default function InfoScreen() {
             <button
               key={link.label}
               type="button"
-              className={`${styles.link} glass-panel`}
+              className={styles.link}
               onClick={() => handleOpenExternal(link.url)}
             >
               <span>{link.label}</span>
@@ -79,7 +43,7 @@ export default function InfoScreen() {
           ))}
         </div>
 
-        <div className={`${styles.card} glass-panel`}>
+        <div className={styles.card}>
           <p className={styles.cardLabel}>Политика конфиденциальности</p>
           <p className={styles.cardValue}>
             Настоящая политика описывает, как Natasha Beauty Lab собирает, использует и защищает персональные данные пользователей приложения.

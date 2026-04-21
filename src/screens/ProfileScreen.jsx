@@ -138,7 +138,7 @@ export default function ProfileScreen() {
         </section>
 
         <footer className={styles.footer}>
-          <button className="btn-ink glass-panel" onClick={openAdmin}>Написать администратору</button>
+          <button className="btn-ink" onClick={openAdmin}>Написать администратору</button>
         </footer>
       </div>
     </div>

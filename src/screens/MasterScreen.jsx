@@ -244,6 +244,69 @@ function ServicesTab() {
   );
 }
 
+// ─── АНАЛИТИКА ────────────────────────────────────────────────────────────────
+function AnalyticsTab() {
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_URL}?action=all_appointments`)
+      .then(r => r.json())
+      .then(d => setAppointments(d.appointments || []))
+      .catch(() => setAppointments([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className={styles.empty}>Сбор данных…</p>;
+  if (!appointments.length) return <p className={styles.empty}>Нет данных для аналитики</p>;
+
+  // Calculations
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const thisMonthApps = appointments.filter(a => {
+    // YDB Datetime is in seconds if < 1e10, otherwise ms
+    const date = new Date(a.appointment_date > 1e10 ? a.appointment_date : a.appointment_date * 1000);
+    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+  });
+
+  const monthlyRevenue = thisMonthApps.reduce((sum, a) => sum + (a.total_price || 0), 0);
+  const totalRevenue = appointments.reduce((sum, a) => sum + (a.total_price || 0), 0);
+
+  // Top Service
+  const serviceCounts = {};
+  appointments.forEach(a => {
+    const name = a.title || a.service_id;
+    serviceCounts[name] = (serviceCounts[name] || 0) + 1;
+  });
+  const topService = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1])[0];
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.analyticsGrid}>
+        <div className={`${styles.analyticsCard} glass-panel`}>
+          <span className={styles.statLabel}>Выручка (Октябрь)</span>
+          <span className={styles.statNumber}>{monthlyRevenue.toLocaleString('ru-RU')} ₽</span>
+          <span className={styles.statSub}>Всего визитов: {thisMonthApps.length}</span>
+        </div>
+
+        <div className={`${styles.analyticsCard} glass-panel`}>
+          <span className={styles.statLabel}>Популярная услуга</span>
+          <span className={styles.statText}>{topService ? topService[0] : '—'}</span>
+          <span className={styles.statSub}>Сделано раз: {topService ? topService[1] : 0}</span>
+        </div>
+
+        <div className={`${styles.analyticsCard} glass-panel`} style={{ gridColumn: '1 / -1' }}>
+          <span className={styles.statLabel}>Выручка (За все время)</span>
+          <span className={styles.statNumber}>{totalRevenue.toLocaleString('ru-RU')} ₽</span>
+          <span className={styles.statSub}>Всего записей в базе: {appointments.length}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function MasterScreen() {
   const { user } = useVK();
@@ -270,9 +333,12 @@ export default function MasterScreen() {
             onClick={() => setTab('appointments')}>Записи</button>
           <button className={`${styles.tab} ${tab === 'services' ? styles.tabActive : ''} glass-panel`}
             onClick={() => setTab('services')}>Услуги</button>
+          <button className={`${styles.tab} ${tab === 'analytics' ? styles.tabActive : ''} glass-panel`}
+            onClick={() => setTab('analytics')}>Аналитика</button>
         </div>
         {tab === 'appointments' && <AppointmentsTab />}
         {tab === 'services' && <ServicesTab />}
+        {tab === 'analytics' && <AnalyticsTab />}
       </div>
     </div>
   );

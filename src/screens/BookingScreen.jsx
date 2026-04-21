@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import SplitText from '../components/SplitText.jsx';
 import ServiceConstructor from '../components/ServiceConstructor.jsx';
 import BookingModal from '../components/BookingModal.jsx';
 import ConfirmationParticles from '../components/ConfirmationParticles.jsx';
@@ -26,9 +25,7 @@ const CATEGORY_TEMPLATE = [
 export default function BookingScreen({ onConfirmChange }) {
   const listRef = useRef(null);
   const { triggerHaptic, user } = useVK();
-  const defaultTab = CATEGORY_TEMPLATE[0]?.id ?? 'nails';
   const [categories, setCategories] = useState(() => CATEGORY_TEMPLATE.map((meta) => ({ ...meta, items: [] })));
-  const [activeTab, setActiveTab] = useState(defaultTab);
   const [activeService, setActiveService] = useState(null);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,8 +35,6 @@ export default function BookingScreen({ onConfirmChange }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmState, setConfirmState] = useState(null);
   const [selectedDate] = useState(() => new Date().toISOString());
-  const activeCategory = categories.find((category) => category.id === activeTab);
-  const filteredServices = activeCategory?.items ?? [];
   useViscousScroll(listRef);
 
   useEffect(() => {
@@ -113,7 +108,8 @@ export default function BookingScreen({ onConfirmChange }) {
     setActiveService(service);
   };
 
-  const glowCategory = activeService?.category || activeTab || 'default';
+  const primaryCategory = categories.find((category) => category.items?.length > 0) ?? categories[0];
+  const glowCategory = activeService?.category || primaryCategory?.id || 'default';
 
   const getNumericPrice = (service) => {
     if (!service) return 0;
@@ -217,25 +213,7 @@ export default function BookingScreen({ onConfirmChange }) {
 
         <div className={styles.contentLayer}>
           <div className={styles.header}>
-            <span className={styles.kicker}>ЗАПИСЬ</span>
-            <SplitText text="ваш ритуал" className={styles.title} delay={0.1} />
-          </div>
-
-          <div className={styles.tabsContainer}>
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                className={`${styles.tab} glass-panel ${activeTab === category.id ? `${styles.activeTab} glass-panel-active` : ''}`}
-                onClick={() => {
-                  triggerHaptic('light');
-                  setActiveTab(category.id);
-                  setActiveService(null);
-                }}
-              >
-                {category.title}
-              </button>
-            ))}
+            <h1 className={styles.title}>Меню услуг</h1>
           </div>
 
           <motion.div
@@ -262,7 +240,7 @@ export default function BookingScreen({ onConfirmChange }) {
                     Повторить запрос
                   </button>
                 </div>
-              ) : filteredServices.length === 0 ? (
+              ) : !categories.some((category) => category.items.length > 0) ? (
                 <div className={`${styles.emptyState} glass-panel`}>
                   <p>Каталог услуг обновляется. Менеджер подберёт ритуал вручную после консультации.</p>
                   <button
@@ -277,74 +255,83 @@ export default function BookingScreen({ onConfirmChange }) {
                   </button>
                 </div>
               ) : (
-                filteredServices.map((service, index) => (
-                  <motion.div
-                    key={service.id}
-                    role="button"
-                    tabIndex={0}
-                    data-viscous
-                    className={`${styles.serviceCard} glass-panel ${activeService?.id === service.id ? `${styles.activeCard} glass-panel-active` : ''}`}
-                    whileTap={{ scale: 0.96 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut', delay: index * 0.04 } }}
-                    onClick={() => handleServiceSelect(service)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        handleServiceSelect(service);
-                      }
-                    }}
-                  >
-                    <div className={styles.cardContent}>
-                      <h3 className={styles.serviceTitle}>{service.title}</h3>
-
-                      <div className={styles.serviceMetadata}>
-                        <span className={styles.serviceDuration}>{service.duration}</span>
-                        <span className={styles.servicePrice}>{service.price}</span>
-                      </div>
-                    </div>
-
-                    <AnimatePresence initial={false}>
-                      {activeService?.id === service.id && (
+                categories.map((category) => (
+                  category.items.length > 0 && (
+                    <div key={category.id} className={styles.categoryGroup}>
+                      <h2 className={styles.categoryDivider}>{category.title}</h2>
+                      {category.items.map((service, index) => (
                         <motion.div
-                          initial={{ height: 0, opacity: 0, marginTop: 0 }}
-                          animate={{ height: 'auto', opacity: 1, marginTop: 16 }}
-                          exit={{ height: 0, opacity: 0, marginTop: 0 }}
-                          style={{ overflow: 'hidden', width: '100%' }}
+                          key={service.id}
+                          role="button"
+                          tabIndex={0}
+                          data-viscous
+                          className={`${styles.serviceCard} glass-panel ${activeService?.id === service.id ? `${styles.activeCard} glass-panel-active` : ''}`}
+                          whileTap={{ scale: 0.96 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut', delay: index * 0.04 } }}
+                          onClick={() => handleServiceSelect(service)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              handleServiceSelect(service);
+                            }
+                          }}
                         >
-                          {service.hasModifiers ? (
-                            <ServiceConstructor
-                              service={service}
-                              modifiersData={NAIL_MODIFIERS}
-                              isSubmitting={isSubmitting}
-                              onBook={(payload) => {
-                                triggerHaptic('heavy');
-                                handleBookingRequest(payload);
-                              }}
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              className={styles.inlineBookButton}
-                              disabled={isSubmitting}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                triggerHaptic('heavy');
-                                handleBookingRequest({ service, totalPrice: getNumericPrice(service), url: service?.bookingUrl || '' });
-                              }}
-                            >
-                              {isSubmitting ? 'Отправка...' : 'Записаться онлайн'}
-                            </button>
-                          )}
+                          <div className={styles.cardContent}>
+                            <div>
+                              <p className={styles.serviceTitle}>{service.title}</p>
+                              <p className={styles.serviceDescription}>{service.description || 'Персональный уход, подобранный мастером'}</p>
+                            </div>
+                            <div className={styles.serviceMetadata}>
+                              <span className={styles.serviceDuration}>{service.duration || '60 мин'}</span>
+                              <span className={styles.servicePrice}>{typeof service.price === 'string' ? service.price : `${service.price || service.basePrice || '—'} ₽`}</span>
+                            </div>
+                          </div>
+                          <AnimatePresence>
+                            {activeService?.id === service.id && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                                animate={{ height: 'auto', opacity: 1, marginTop: 16 }}
+                                exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                                style={{ overflow: 'hidden', width: '100%' }}
+                              >
+                                {service.hasModifiers ? (
+                                  <ServiceConstructor
+                                    service={service}
+                                    modifiersData={NAIL_MODIFIERS}
+                                    isSubmitting={isSubmitting}
+                                    onBook={(payload) => {
+                                      triggerHaptic('heavy');
+                                      handleBookingRequest(payload);
+                                    }}
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className={styles.inlineBookButton}
+                                    disabled={isSubmitting}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      triggerHaptic('heavy');
+                                      handleBookingRequest({ service, totalPrice: getNumericPrice(service), url: service?.bookingUrl || '' });
+                                    }}
+                                  >
+                                    {isSubmitting ? 'Отправка...' : 'Записаться онлайн'}
+                                  </button>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
+                      ))}
+                    </div>
+                  )
                 ))
               )}
             </motion.div>
           </motion.div>
+
         </div>
       </div>
 

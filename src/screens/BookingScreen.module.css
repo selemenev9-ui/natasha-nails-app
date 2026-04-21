@@ -26,61 +26,32 @@
 .header {
   position: relative;
   z-index: 2;
-  margin-bottom: 28px;
-}
-
-.kicker {
-  font-size: 11px;
-  letter-spacing: 0.3em;
-  color: var(--ink-60);
-  text-transform: uppercase;
+  margin-bottom: 0;
 }
 
 .title {
   font-family: var(--font-display);
-  font-size: 34px;
-  text-transform: lowercase;
-  margin: 4px 0 0;
-}
-
-.tabsContainer {
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
-  padding: 8px 20px 16px;
-  margin: 0 -20px;
-  overflow-x: auto;
-  overflow-y: visible;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.tabsContainer::-webkit-scrollbar {
-  display: none;
-}
-
-.tab {
-  min-height: 40px;
-  padding: 8px 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  font-size: 12px;
+  font-size: 28px;
+  text-transform: none;
+  margin: 0;
   font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink);
-  white-space: nowrap;
-  transition: transform 0.2s var(--smooth), color 0.25s var(--smooth);
-  font-family: var(--font-body);
-  background: rgba(255, 255, 255, 0.4);
 }
 
-.activeTab {
+.categoryGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.categoryDivider {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-style: italic;
   color: var(--ink);
-  transform: translateY(-1px);
-  background: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  margin: 0 0 8px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding-bottom: 8px;
 }
 
 .step {
@@ -118,7 +89,7 @@
 .bookingError {
   margin: 18px 0 0;
   text-align: center;
-  color: #ffb4b4;
+  color: var(--ink);
   font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -223,7 +194,7 @@
 .selectedTitle {
   font-size: 14px;
   font-weight: 500;
-  color: #1c1c1e;
+  color: var(--ink);
 }
 
 .selectedPrice {
@@ -338,7 +309,7 @@
 }
 
 .confirmRingSpinner {
-  border-top-color: rgba(255, 255, 255, 0.7);
+  border-top-color: var(--ink);
   border-left-color: transparent;
   animation: spin 8s linear infinite;
 }

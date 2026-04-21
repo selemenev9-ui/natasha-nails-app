@@ -88,7 +88,7 @@ export default function OnboardingScreen({ onComplete }) {
 
         <button
           type="button"
-          className="btn-ink glass-panel"
+          className="btn-ink"
           onClick={handleNext}
           style={{ opacity: isLastSlide && !agreed ? 0.4 : 1, transition: 'opacity 0.2s' }}
         >

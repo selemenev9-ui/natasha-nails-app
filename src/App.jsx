@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import HomeScreen from './screens/HomeScreen.jsx';
 import BookingScreen from './screens/BookingScreen.jsx';
 import InfoScreen from './screens/InfoScreen.jsx';
 import ProfileScreen from './screens/ProfileScreen.jsx';
@@ -15,60 +14,77 @@ import { useVK } from './contexts/VKContext.jsx';
  * is wired as a dependency and can be swapped in here for hash-based routing
  * when the app is published inside VK.
  */
-const ROUTES = ['home', 'booking', 'info', 'profile', 'master'];
+const ROUTES = ['booking', 'info', 'profile', 'master'];
 
 const pageVariants = {
   initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.22, ease: 'easeOut' } },
-  exit: { opacity: 1, transition: { duration: 0 } }
+  animate: { opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } },
+  exit: { opacity: 0, transition: { duration: 0.2, ease: 'easeIn' } }
 };
 
-const homeVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.22, ease: 'easeOut' } },
-  exit: { opacity: 1, transition: { duration: 0 } }
-};
-
-function Loader() {
+function SplashScreen() {
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.8, ease: 'easeOut' } }}
       style={{
-        minHeight: '100dvh',
+        position: 'fixed',
+        inset: 0,
+        background: '#000000',
         display: 'grid',
         placeItems: 'center',
-        fontSize: '13px',
-        letterSpacing: '0.2em',
-        textTransform: 'uppercase',
-        color: 'var(--ink-60)'
+        zIndex: 999,
+        pointerEvents: 'none'
       }}
     >
-      Загрузка
-    </div>
+      <motion.span
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 1.04, transition: { duration: 0.8, ease: 'easeInOut' } }}
+        transition={{ duration: 1.5, ease: 'easeOut' }}
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '28px',
+          letterSpacing: '0.45em',
+          color: '#FFFFFF',
+          textTransform: 'uppercase'
+        }}
+      >
+        NATASHA LAB
+      </motion.span>
+    </motion.div>
   );
 }
 
 export default function App() {
   const { isBridgeLoading, isFirstVisit, completeOnboarding } = useVK();
-  const [route, setRoute] = useState('home');
+  const [route, setRoute] = useState('profile');
   const [isConfirm, setIsConfirm] = useState(false);
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
   const currentScreen = route;
 
   const navigate = (next) => {
     if (!ROUTES.includes(next)) return;
     setRoute(next);
   };
-  if (isBridgeLoading) {
-    return (
-      <div className="app-shell">
-        <Loader />
-      </div>
-    );
-  }
+
+  useEffect(() => {
+    if (isBridgeLoading) {
+      setIsSplashVisible(true);
+      return;
+    }
+    const timeout = setTimeout(() => setIsSplashVisible(false), 1200);
+    return () => clearTimeout(timeout);
+  }, [isBridgeLoading]);
+
+  const showSplash = isBridgeLoading || isSplashVisible;
 
   if (isFirstVisit) {
     return (
       <div className="app-shell">
         <OnboardingScreen onComplete={completeOnboarding} />
+        <AnimatePresence>{showSplash && <SplashScreen key="splash" />}</AnimatePresence>
       </div>
     );
   }
@@ -77,73 +93,24 @@ export default function App() {
     <div className="app-shell">
       <div className="material" />
       <AnimatePresence mode="wait">
-        {currentScreen === 'home' && (
-          <motion.div
-            key={currentScreen}
-            variants={homeVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <HomeScreen onNavigate={navigate} />
-          </motion.div>
-        )}
-
-        {currentScreen === 'booking' && (
-          <motion.div
-            key={currentScreen}
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <BookingScreen onNavigate={navigate} onConfirmChange={setIsConfirm} />
-          </motion.div>
-        )}
-
-        {currentScreen === 'info' && (
-          <motion.div
-            key={currentScreen}
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <InfoScreen />
-          </motion.div>
-        )}
-
-        {currentScreen === 'profile' && (
-          <motion.div
-            key="profile"
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <ProfileScreen />
-          </motion.div>
-        )}
-        {currentScreen === 'master' && (
-          <motion.div
-            key="master"
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <MasterScreen />
-          </motion.div>
-        )}
-        
+        <motion.div
+          key={currentScreen}
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          style={{ width: '100%', height: '100%' }}
+        >
+          {currentScreen === 'booking' && <BookingScreen onNavigate={navigate} onConfirmChange={setIsConfirm} />}
+          {currentScreen === 'info' && <InfoScreen />}
+          {currentScreen === 'profile' && <ProfileScreen />}
+          {currentScreen === 'master' && <MasterScreen />}
+        </motion.div>
       </AnimatePresence>
 
       <TabBar active={route} onChange={navigate} isHidden={isConfirm} />
+
+      <AnimatePresence>{showSplash && <SplashScreen key="splash" />}</AnimatePresence>
     </div>
   );
 }

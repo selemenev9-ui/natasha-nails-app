@@ -62,7 +62,7 @@ export default function ServiceDrawer({ isOpen, onClose, data }) {
             <h2 className={styles.title}>{data.title}</h2>
             <p className={styles.description}>{data.description}</p>
             <div className={styles.price}>{data.price}</div>
-            <button type="button" className="btn-ink glass-panel" onClick={handleBook}>
+            <button type="button" className="btn-ink" onClick={handleBook}>
               Записаться онлайн
             </button>
           </motion.div>

@@ -75,16 +75,12 @@ src/hooks/useViscousScroll.js
 src/main.jsx
 src/screens/BookingScreen.jsx
 src/screens/BookingScreen.module.css
-src/screens/HomeScreen.jsx
-src/screens/HomeScreen.module.css
 src/screens/InfoScreen.jsx
 src/screens/InfoScreen.module.css
 src/screens/MasterScreen.jsx
 src/screens/MasterScreen.module.css
 src/screens/OnboardingScreen.jsx
 src/screens/OnboardingScreen.module.css
-src/screens/PortfolioScreen.jsx
-src/screens/PortfolioScreen.module.css
 src/screens/ProfileScreen.jsx
 src/screens/ProfileScreen.module.css
 src/styles/global.css
@@ -180,80 +176,6 @@ repomix-output.xml
     "vite": "^5.4.10"
   }
 }
-</file>
-
-<file path="PROJECT_BRAIN.md">
-# NATASHA NAILS APP — PROJECT BRAIN
-
-## Стек
-- React + Vite, VK Mini App
-- Yandex Cloud Functions (Node.js 22, ESM)
-- YDB Serverless (natasha-db)
-- Framer Motion, Three.js (rings на Home)
-- НЕТ Zustand — стейт через useState + VKContext
-
-## API
-- URL: https://functions.yandexcloud.net/d4eb8ife6rqecrip6jp3
-- GET → { services: [...] }
-- POST → { service_id, client_id, date, totalPrice } → { ok, appointment_id }
-- Сервисный аккаунт: natasha-api-sa (ydb.editor)
-- Env: YDB_ENDPOINT, YDB_DATABASE
-
-## Схема YDB
-- services: id(Utf8), category(Utf8), title(Utf8), price(Int32), duration_minutes(Int32)
-- appointments: id(Utf8), client_id(Utf8), service_id(Utf8), appointment_date(Datetime), status(Utf8), total_price(Int32)
-- clients: id(Utf8), vk_id(Utf8), first_name(Utf8), phone(Utf8), registered_at(Datetime)
-
-## Критичные решения (не менять)
-- extractValue() парсит protobuf через JSON.parse(JSON.stringify(cell)) — без этого int32 читается как пустая строка
-- appointment_date пишется через CAST("..." AS Datetime), формат: 2026-04-21T00:12:54Z
-- total_price: CAST(N AS Int32)
-- package.json функции: оставить @yandex-cloud/nodejs-sdk, не удалять
-
-## Экраны
-- Home — категории + ServiceDrawer, данные хардкод (не из API)
-- Booking — услуги из API, POST запись, hasModifiers → ServiceConstructor
-- Portfolio — статичный
-- Info — статичный
-- Profile — VK user, BeautyCard, CareAccordion (советы), кнопка написать админу
-
-## Навигация
-- Простой useState route в App.jsx — НЕ менять на router, сломает VK Bridge
-
-## КЛАДБИЩЕ
-- TypedData.asRows — не существует в ydb-sdk v5
-- .nativeObjects — возвращает пустой результат
-- 'textValue' in cell без JSON.parse — всегда true из-за protobuf прототипа
-- Параметризованные запросы с typeId — не работают, использовать inline CAST
-- LEFT JOIN без AS возвращает колонки с префиксом "a.id" — всегда писать явные алиасы AS
-
-## Текущий фокус
-- ~~Этап 1: ProfileScreen — история визитов~~ ✅
-- ~~Этап 2: MasterScreen — записи + полный CRUD услуг~~ ✅
-- ~~Этап 3: Политика конфиденциальности + онбординг~~ ✅
-- ~~Деплой GitHub Pages~~ ✅
-- VK Dev: создано приложение ID 54555974, URL вставлен ✅
-- Ожидаем иконки от дизайнера → загрузить в Оформление → подать на модерацию
-- Этап 4: Уведомления VK Notify (после модерации)
-
-## VK App
-- App ID: 54555974
-- URL: https://selemenev9-ui.github.io/natasha-nails-app/
-- Группа: Natasha Premium Lab
-- Статус: Непроверенное, доступно по ссылке
-
-## Схема services (обновлено)
-- is_active (Bool) — скрыть без удаления
-- Клиентский GET возвращает только is_active=true
-- Мастерский GET: ?action=all_services — все включая скрытые
-
-## MASTER_IDS
-- ['80557585', '187729875', '123456789']
-- 123456789 — тестовый локалхост, убрать перед финальным деплоем
-
-## Деплой
--  задеплоено в VK (есть группа, передать Наташе позже)
-- Локально: npm run dev
 </file>
 
 <file path="scripts/fetch-portfolio.js">
@@ -374,179 +296,9 @@ async function run() {
 run();
 </file>
 
-<file path="src/App.jsx">
-import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-
-import HomeScreen from './screens/HomeScreen.jsx';
-import BookingScreen from './screens/BookingScreen.jsx';
-import PortfolioScreen from './screens/PortfolioScreen.jsx';
-import InfoScreen from './screens/InfoScreen.jsx';
-import ProfileScreen from './screens/ProfileScreen.jsx';
-import MasterScreen from './screens/MasterScreen.jsx';
-import OnboardingScreen from './screens/OnboardingScreen.jsx';
-import TabBar from './components/TabBar.jsx';
-import { useVK } from './contexts/VKContext.jsx';
-
-/**
- * Routes map. We use internal state for simplicity; @vkontakte/vk-mini-apps-router
- * is wired as a dependency and can be swapped in here for hash-based routing
- * when the app is published inside VK.
- */
-const ROUTES = ['home', 'booking', 'portfolio', 'info', 'profile', 'master'];
-
-const pageVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.22, ease: 'easeOut' } },
-  exit: { opacity: 1, transition: { duration: 0 } }
-};
-
-const homeVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.22, ease: 'easeOut' } },
-  exit: { opacity: 1, transition: { duration: 0 } }
-};
-
-function Loader() {
-  return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        display: 'grid',
-        placeItems: 'center',
-        fontSize: '13px',
-        letterSpacing: '0.2em',
-        textTransform: 'uppercase',
-        color: 'var(--ink-60)'
-      }}
-    >
-      Загрузка
-    </div>
-  );
-}
-
-export default function App() {
-  const { isBridgeLoading, isFirstVisit, completeOnboarding } = useVK();
-  const [route, setRoute] = useState('home');
-  const [isDark, setIsDark] = useState(false);
-  const [isConfirm, setIsConfirm] = useState(false);
-  const currentScreen = route;
-
-  useEffect(() => {
-    document.body.style.background = isDark ? '#111820' : '#F5F0E8';
-  }, [isDark]);
-
-  const navigate = (next) => {
-    if (!ROUTES.includes(next)) return;
-    setRoute(next);
-  };
-  if (isBridgeLoading) {
-    return (
-      <div className="app-shell" style={{ background: isDark ? '#111820' : undefined }}>
-        <Loader />
-      </div>
-    );
-  }
-
-  if (isFirstVisit) {
-    return (
-      <div className="app-shell" style={{ background: isDark ? '#111820' : undefined }}>
-        <OnboardingScreen onComplete={completeOnboarding} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="app-shell" style={{ background: isDark ? '#111820' : undefined }}>
-      <div className="material" />
-      <AnimatePresence mode="wait">
-        {currentScreen === 'home' && (
-          <motion.div
-            key={currentScreen}
-            variants={homeVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <HomeScreen onNavigate={navigate} />
-          </motion.div>
-        )}
-
-        {currentScreen === 'booking' && (
-          <motion.div
-            key={currentScreen}
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <BookingScreen onNavigate={navigate} onDarkChange={setIsDark} onConfirmChange={setIsConfirm} />
-          </motion.div>
-        )}
-
-        {currentScreen === 'portfolio' && (
-          <motion.div
-            key={currentScreen}
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <PortfolioScreen />
-          </motion.div>
-        )}
-
-        {currentScreen === 'info' && (
-          <motion.div
-            key={currentScreen}
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <InfoScreen />
-          </motion.div>
-        )}
-
-        {currentScreen === 'profile' && (
-          <motion.div
-            key="profile"
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <ProfileScreen />
-          </motion.div>
-        )}
-        {currentScreen === 'master' && (
-          <motion.div
-            key="master"
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <MasterScreen />
-          </motion.div>
-        )}
-        
-      </AnimatePresence>
-
-      <TabBar active={route} onChange={navigate} isHidden={isConfirm} />
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/BeautyCard.jsx">
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import styles from './BeautyCard.module.css';
 
 const MAX_TILT = 10;
@@ -569,6 +321,7 @@ export default function BeautyCard({ firstName, vkId, theme = 'light' }) {
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
   const [isReturning, setIsReturning] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
   const needsPermission = typeof window !== 'undefined' && typeof window.DeviceOrientationEvent !== 'undefined' && typeof window.DeviceOrientationEvent.requestPermission === 'function';
   const [gyroReady, setGyroReady] = useState(!needsPermission);
   const [gyroDenied, setGyroDenied] = useState(false);
@@ -725,252 +478,88 @@ export default function BeautyCard({ firstName, vkId, theme = 'light' }) {
   const displayVkId = vkId ?? '000000000';
 
   return (
-    <div className={styles.perspectiveWrap}>
-      <article
-        ref={cardRef}
+    <div
+      ref={cardRef}
+      className={styles.perspectiveWrap}
+      style={transformStyle}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onPointerDown={requestGyroAccess}
+      onClick={() => setIsFlipped((prev) => !prev)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setIsFlipped((prev) => !prev);
+        }
+      }}
+    >
+      <motion.article
         className={`${styles.card} ${theme === 'dark' ? styles.dark : styles.light}`}
-        style={transformStyle}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onPointerDown={requestGyroAccess}
+        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        transition={{ type: 'spring', stiffness: 60, damping: 15, mass: 1.5 }}
+        style={{ transformStyle: 'preserve-3d' }}
       >
-        <div className={`${styles.brand} ${styles.levitate}`}>NATASHA LAB</div>
-        <div className={`${styles.name} ${styles.levitate}`}>{displayName}</div>
+        <div className={styles.frontFace}>
+          <div className={`${styles.brand} ${styles.levitate}`}>NATASHA LAB</div>
+          <div className={`${styles.name} ${styles.levitate}`}>{displayName}</div>
 
-        <div className={styles.bottomRow}>
-          <span className={`${styles.status} ${styles.levitate}`}>BEAUTY ID</span>
-          <span className={`${styles.vkId} ${styles.levitate}`}>{displayVkId}</span>
+          <div className={styles.bottomRow}>
+            <span className={`${styles.status} ${styles.levitate}`}>BEAUTY ID</span>
+            <span className={`${styles.vkId} ${styles.levitate}`}>{displayVkId}</span>
+          </div>
+
+          <div className={styles.glare} style={glareStyle} />
+          <div className={styles.rim} style={rimStyle} />
+          <div className={styles.grain} />
+          <div className={styles.sweep} />
+
+          <AnimatePresence>
+            {needsPermission && !gyroReady && !gyroDenied && (
+              <motion.button
+                key="gyro-prompt"
+                type="button"
+                className={styles.gyroPrompt}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  requestGyroAccess();
+                }}
+              >
+                Включить гироскоп
+              </motion.button>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {gyroDenied && (
+              <motion.p
+                key="gyro-hint"
+                className={styles.gyroHint}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                Разрешите «Движение и ориентацию» в настройках браузера
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className={styles.glare} style={glareStyle} />
-        <div className={styles.rim} style={rimStyle} />
-        <div className={styles.grain} />
-        <div className={styles.sweep} />
-        {needsPermission && !gyroReady && !gyroDenied && (
-          <button type="button" className={styles.gyroPrompt} onClick={requestGyroAccess}>
-            Включить гироскоп
-          </button>
-        )}
-        {gyroDenied && (
-          <p className={styles.gyroHint}>Разрешите «Движение и ориентацию» в настройках браузера</p>
-        )}
-      </article>
+        <div className={styles.backFace} style={{ transform: 'rotateY(180deg) translateZ(1px)' }}>
+          <div className={styles.magneticStrip} />
+          <div className={styles.backContent}>
+            <p>PRIVATE MEMBER</p>
+            <p className={styles.vkId}>{displayVkId}</p>
+          </div>
+        </div>
+      </motion.article>
     </div>
   );
-}
-</file>
-
-<file path="src/components/BeautyCard.module.css">
-.perspectiveWrap {
-  width: 100%;
-  height: 100%;
-  perspective: 1000px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card {
-  position: relative;
-  width: min(100%, 340px);
-  height: 100%;
-  border-radius: 20px;
-  transform-style: preserve-3d;
-  overflow: hidden;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.62) 0%, rgba(245, 240, 232, 0.72) 55%, rgba(255, 255, 255, 0.4) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 18px;
-}
-
-.light {
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.62) 0%, rgba(245, 240, 232, 0.72) 55%, rgba(255, 255, 255, 0.4) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: var(--ink);
-}
-
-.dark {
-  background:
-    linear-gradient(145deg, rgba(30, 30, 30, 0.6) 0%, rgba(10, 10, 10, 0.8) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #f4e8cf;
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.52), transparent 58%);
-  pointer-events: none;
-}
-
-.dark::before {
-  background: radial-gradient(circle at 18% 18%, rgba(220, 220, 220, 0.2), transparent 60%);
-}
-
-.levitate {
-  position: relative;
-  z-index: 3;
-  transform: translateZ(30px);
-}
-
-.brand {
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  opacity: 0.78;
-}
-
-.name {
-  align-self: center;
-  margin-top: -8px;
-  font-family: var(--font-display);
-  font-size: 42px;
-  line-height: 1;
-  text-align: center;
-}
-
-.bottomRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
-
-.status {
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  opacity: 0.72;
-}
-
-.vkId {
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  opacity: 0.6;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
-}
-
-.light .brand,
-.light .name,
-.light .status,
-.light .vkId {
-  color: var(--ink);
-}
-
-.dark .brand,
-.dark .name,
-.dark .status,
-.dark .vkId {
-  color: #f4e8cf;
-}
-
-.glare {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 2;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.rim {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 1;
-  transition: box-shadow 0.18s ease-out;
-}
-
-.grain {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.06;
-  background-image:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px),
-    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px),
-    radial-gradient(circle at 40% 70%, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px);
-  background-size: 9px 9px, 11px 11px, 13px 13px;
-  mix-blend-mode: soft-light;
-}
-
-.sweep {
-  position: absolute;
-  inset: -20% -80%;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 2;
-  background: linear-gradient(110deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0) 62%);
-  transform: translateX(-120%);
-  animation: sweep-in 1.15s ease-out 0.2s both;
-}
-
-.dark .grain {
-  opacity: 0.08;
-}
-
-.dark .sweep {
-  background: linear-gradient(110deg, rgba(255, 255, 255, 0) 38%, rgba(255, 230, 190, 0.2) 50%, rgba(255, 255, 255, 0) 62%);
-}
-
-@keyframes sweep-in {
-  0% {
-    transform: translateX(-120%);
-    opacity: 0;
-  }
-
-  22% {
-    opacity: 0.85;
-  }
-
-  70% {
-    opacity: 0.28;
-  }
-
-  100% {
-    transform: translateX(120%);
-    opacity: 0;
-  }
-}
-
-.gyroPrompt,
-.gyroHint {
-  position: absolute;
-  inset: auto 16px 16px;
-  z-index: 4;
-  border-radius: 999px;
-  text-align: center;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-}
-
-.gyroPrompt {
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.35);
-  color: var(--ink);
-  padding: 10px 18px;
-  text-transform: uppercase;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-
-.gyroHint {
-  margin: 0;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  padding: 12px 14px;
-  border-radius: 12px;
-  font-weight: 500;
 }
 </file>
 
@@ -1007,63 +596,6 @@ export default function BookingModal({ isOpen, onClose }) {
       ) : null}
     </AnimatePresence>
   );
-}
-</file>
-
-<file path="src/components/BookingModal.module.css">
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 24px 20px calc(var(--safe-bottom, 0px) + 24px);
-  background: rgba(2, 2, 6, 0.7);
-  backdrop-filter: blur(20px);
-}
-
-.sheet {
-  width: min(520px, 100%);
-  border-radius: 32px 32px 24px 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 10, 14, 0.92);
-  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.65);
-  padding: 28px 24px 36px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.closeButton {
-  align-self: center;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  border-radius: 999px;
-  padding: 10px 26px;
-  font-size: 13px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.closeButton:active {
-  transform: translateY(1px);
-}
-
-.placeholder {
-  border-radius: 20px;
-  border: 1px dashed rgba(255, 255, 255, 0.3);
-  padding: 24px;
-  text-align: center;
-  font-size: 15px;
-  line-height: 1.6;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.85);
-  background: linear-gradient(135deg, rgba(76, 29, 149, 0.2), rgba(10, 10, 14, 0.85));
 }
 </file>
 
@@ -1717,71 +1249,6 @@ export default function ServiceConstructor({ service, modifiersData, onBook, isS
 }
 </file>
 
-<file path="src/components/ServiceConstructor.module.css">
-.container {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.categoryBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.categoryTitle {
-  font-size: 13px;
-  color: var(--ink-60);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin: 0;
-}
-
-.optionsGrid {
-  display: grid;
-  gap: 8px;
-}
-
-.optionCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-radius: 16px;
-  cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  transition: border-color 0.2s var(--smooth), background 0.2s var(--smooth);
-}
-
-.optionCardActive {
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.optionLabel {
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.optionPrice {
-  font-size: 13px;
-  color: var(--ink-60);
-}
-
-.bookButton {
-  width: 100%;
-  margin-top: 10px;
-}
-
-.bookButton:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-</file>
-
 <file path="src/components/ServiceDrawer.jsx">
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion';
 import styles from './ServiceDrawer.module.css';
@@ -1847,7 +1314,7 @@ export default function ServiceDrawer({ isOpen, onClose, data }) {
             <h2 className={styles.title}>{data.title}</h2>
             <p className={styles.description}>{data.description}</p>
             <div className={styles.price}>{data.price}</div>
-            <button type="button" className="btn-ink glass-panel" onClick={handleBook}>
+            <button type="button" className="btn-ink" onClick={handleBook}>
               Записаться онлайн
             </button>
           </motion.div>
@@ -1972,96 +1439,6 @@ export default function SplitText({ text, className, delay = 0 }) {
       ))}
     </span>
   );
-}
-</file>
-
-<file path="src/components/TabBar.module.css">
-.bar {
-  position: fixed;
-  bottom: 14px;
-  left: 8px;
-  right: 8px;
-  margin: 0 auto;
-  width: calc(100% - 16px);
-  max-width: 414px;
-  padding: 8px 10px calc(var(--safe-bottom) + 8px);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-radius: 28px;
-  z-index: 40;
-  border: none;
-}
-
-.tab {
-  flex: 1;
-  border: none;
-  background: transparent;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  min-height: 46px;
-  padding: 6px 2px 4px;
-  border-radius: 14px;
-  font-size: 12px;
-  color: var(--ink-60);
-  transition: color 0.3s var(--smooth), transform 0.2s var(--smooth);
-}
-
-.tab:active {
-  transform: translateY(1px);
-}
-
-.active {
-  color: var(--ink);
-}
-
-.iconWrap {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  transition: background 0.3s var(--smooth);
-}
-
-.active .iconWrap {
-  background: rgba(28, 28, 30, 0.08);
-}
-
-.icon {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.5;
-  transition: opacity 0.3s var(--smooth);
-}
-
-.iconActive {
-  opacity: 1;
-}
-
-.dot {
-  position: absolute;
-  bottom: -4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.label {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  line-height: 1.1;
-  text-transform: uppercase;
 }
 </file>
 
@@ -2368,1672 +1745,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 );
 </file>
 
-<file path="src/screens/BookingScreen.jsx">
-import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import SplitText from '../components/SplitText.jsx';
-import ServiceConstructor from '../components/ServiceConstructor.jsx';
-import BookingModal from '../components/BookingModal.jsx';
-import ConfirmationParticles from '../components/ConfirmationParticles.jsx';
-import useViscousScroll from '../hooks/useViscousScroll.js';
-import { useVK } from '../contexts/VKContext.jsx';
-import { NAIL_MODIFIERS } from '../data/services.js';
-import { API_URL } from '../utils/config.js';
-import styles from './BookingScreen.module.css';
-
-const CATEGORY_COLORS = {
-  default: 'rgba(26, 26, 31, 0.65)',
-  nails: 'rgba(76, 29, 149, 0.65)',
-  solarium: 'rgba(120, 53, 15, 0.6)',
-  extra: 'rgba(255, 255, 255, 0.08)'
-};
-
-const CATEGORY_TEMPLATE = [
-  { id: 'nails', title: 'Маникюр & Педикюр' },
-  { id: 'solarium', title: 'Солярий' },
-  { id: 'extra', title: 'Дополнительно' }
-];
-
-export default function BookingScreen({ onDarkChange, onConfirmChange }) {
-  const listRef = useRef(null);
-  const { triggerHaptic, user } = useVK();
-  const defaultTab = CATEGORY_TEMPLATE[0]?.id ?? 'nails';
-  const [categories, setCategories] = useState(() => CATEGORY_TEMPLATE.map((meta) => ({ ...meta, items: [] })));
-  const [activeTab, setActiveTab] = useState(defaultTab);
-  const [activeService, setActiveService] = useState(null);
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [bookingError, setBookingError] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmState, setConfirmState] = useState(null);
-  const [selectedDate] = useState(() => new Date().toISOString());
-  const activeCategory = categories.find((category) => category.id === activeTab);
-  const filteredServices = activeCategory?.items ?? [];
-  useViscousScroll(listRef);
-
-  useEffect(() => {
-    onConfirmChange?.(false);
-    onDarkChange?.(false);
-  }, [onConfirmChange, onDarkChange]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const controller = new AbortController();
-
-    async function loadServices() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(API_URL, { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error(`Ошибка ${response.status}`);
-        }
-
-        const payload = await response.json();
-        const services = Array.isArray(payload?.services) ? payload.services : Array.isArray(payload) ? payload : null;
-        console.log('Загруженные услуги:', services);
-
-        if (!Array.isArray(services)) {
-          throw new Error('Некорректный формат данных');
-        }
-
-        const normalized = services.map((service) => ({
-          ...service,
-          category: service?.category || 'nails'
-        }));
-
-        const grouped = CATEGORY_TEMPLATE.map((meta) => ({
-          ...meta,
-          items: normalized.filter((service) => service.category === meta.id)
-        }));
-
-        if (isMounted) {
-          setCategories(grouped);
-          setActiveService(null);
-        }
-      } catch (fetchError) {
-        if (fetchError.name === 'AbortError') return;
-        if (isMounted) {
-          setError(fetchError.message || 'Не удалось загрузить услуги');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadServices();
-
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
-  }, [reloadKey]);
-
-  const handleServiceSelect = (service) => {
-    triggerHaptic('medium');
-
-    if (activeService?.id === service.id) {
-      setActiveService(null);
-      return;
-    }
-
-    setActiveService(service);
-  };
-
-  const glowCategory = activeService?.category || activeTab || 'default';
-
-  const getNumericPrice = (service) => {
-    if (!service) return 0;
-    if (typeof service.basePrice === 'number') return service.basePrice;
-    if (typeof service.price === 'string') {
-      const digits = parseInt(service.price.replace(/[^0-9]/g, ''), 10);
-      return Number.isNaN(digits) ? 0 : digits;
-    }
-    return 0;
-  };
-
-  const handleBookingRequest = async (payload) => {
-    if (!payload?.service) {
-      setIsBookingOpen(true);
-      return;
-    }
-
-    if (isSubmitting) return;
-    if (!payload.service?.id) {
-      setBookingError('Не удалось определить услугу. Попробуйте обновить страницу.');
-      return;
-    }
-    if (!user?.id) {
-      setBookingError('Авторизуйтесь через VK, чтобы продолжить.');
-      return;
-    }
-
-    setBookingError(null);
-    setIsSubmitting(true);
-
-    const bookingDate = payload.date || selectedDate;
-
-    const body = {
-      service_id: payload.service.id,
-      client_id: user.id,
-      date: bookingDate
-    };
-
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Ошибка ${response.status}`);
-      }
-
-      triggerHaptic('medium');
-      setConfirmState({
-        service: payload.service,
-        date: bookingDate,
-        totalPrice: payload.totalPrice || getNumericPrice(payload.service)
-      });
-      onConfirmChange?.(true);
-    } catch (submissionError) {
-      setBookingError(submissionError.message || 'Не удалось создать запись. Попробуйте позже.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleBookingClose = () => {
-    setIsBookingOpen(false);
-  };
-
-  const handleRetry = () => {
-    setReloadKey((key) => key + 1);
-  };
-
-  const handleConfirmClose = () => {
-    setConfirmState(null);
-    onConfirmChange?.(false);
-  };
-
-  const formatBookingDate = (value) => {
-    if (!value) return 'Дата уточняется';
-    try {
-      return new Date(value).toLocaleString('ru-RU', {
-        dateStyle: 'long',
-        timeStyle: 'short'
-      });
-    } catch (err) {
-      return value;
-    }
-  };
-
-  return (
-    <>
-      <div className={styles.booking}>
-        <motion.div
-          className={styles.ambientGlow}
-          animate={{
-            background: `radial-gradient(circle at 35% 35%, ${CATEGORY_COLORS[glowCategory] || CATEGORY_COLORS.default}, transparent 60%), radial-gradient(circle at 70% 65%, rgba(120, 53, 15, 0.4), transparent 65%), #1a1a1f`
-          }}
-          transition={{ duration: 0.8, ease: 'easeInOut' }}
-        />
-
-        <div className={styles.contentLayer}>
-          <div className={styles.header}>
-            <span className={styles.kicker}>ЗАПИСЬ</span>
-            <SplitText text="ваш ритуал" className={styles.title} delay={0.1} />
-          </div>
-
-          <div className={styles.tabsContainer}>
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                className={`${styles.tab} glass-panel ${activeTab === category.id ? `${styles.activeTab} glass-panel-active` : ''}`}
-                onClick={() => {
-                  triggerHaptic('light');
-                  setActiveTab(category.id);
-                  setActiveService(null);
-                }}
-              >
-                {category.title}
-              </button>
-            ))}
-          </div>
-
-          <motion.div
-            className={styles.step}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
-          >
-            <p className={styles.sectionTitle}>Услуги</p>
-            <motion.div className={styles.cardStack} ref={listRef}>
-              {isLoading ? (
-                <div className={styles.loader}>Загрузка услуг…</div>
-              ) : error ? (
-                <div className={`${styles.emptyState} glass-panel`}>
-                  <p>Не удалось загрузить услуги. {error}</p>
-                  <button
-                    type="button"
-                    className={styles.inlineBookButton}
-                    onClick={() => {
-                      triggerHaptic('light');
-                      handleRetry();
-                    }}
-                  >
-                    Повторить запрос
-                  </button>
-                </div>
-              ) : filteredServices.length === 0 ? (
-                <div className={`${styles.emptyState} glass-panel`}>
-                  <p>Каталог услуг обновляется. Менеджер подберёт ритуал вручную после консультации.</p>
-                  <button
-                    type="button"
-                    className={styles.inlineBookButton}
-                    onClick={() => {
-                      triggerHaptic('light');
-                      handleBookingRequest();
-                    }}
-                  >
-                    Записаться у администратора
-                  </button>
-                </div>
-              ) : (
-                filteredServices.map((service, index) => (
-                  <motion.div
-                    key={service.id}
-                    role="button"
-                    tabIndex={0}
-                    data-viscous
-                    className={`${styles.serviceCard} glass-panel ${activeService?.id === service.id ? `${styles.activeCard} glass-panel-active` : ''}`}
-                    whileTap={{ scale: 0.96 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut', delay: index * 0.04 } }}
-                    onClick={() => handleServiceSelect(service)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        handleServiceSelect(service);
-                      }
-                    }}
-                  >
-                    <div className={styles.cardContent}>
-                      <h3 className={styles.serviceTitle}>{service.title}</h3>
-
-                      <div className={styles.serviceMetadata}>
-                        <span className={styles.serviceDuration}>{service.duration}</span>
-                        <span className={styles.servicePrice}>{service.price}</span>
-                      </div>
-                    </div>
-
-                    <AnimatePresence initial={false}>
-                      {activeService?.id === service.id && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0, marginTop: 0 }}
-                          animate={{ height: 'auto', opacity: 1, marginTop: 16 }}
-                          exit={{ height: 0, opacity: 0, marginTop: 0 }}
-                          style={{ overflow: 'hidden', width: '100%' }}
-                        >
-                          {service.hasModifiers ? (
-                            <ServiceConstructor
-                              service={service}
-                              modifiersData={NAIL_MODIFIERS}
-                              isSubmitting={isSubmitting}
-                              onBook={(payload) => {
-                                triggerHaptic('heavy');
-                                handleBookingRequest(payload);
-                              }}
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              className={styles.inlineBookButton}
-                              disabled={isSubmitting}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                triggerHaptic('heavy');
-                                handleBookingRequest({ service, totalPrice: getNumericPrice(service), url: service?.bookingUrl || '' });
-                              }}
-                            >
-                              {isSubmitting ? 'Отправка...' : 'Записаться онлайн'}
-                            </button>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                ))
-              )}
-            </motion.div>
-          </motion.div>
-        </div>
-      </div>
-
-      {bookingError ? <p className={styles.bookingError}>{bookingError}</p> : null}
-
-      <BookingModal isOpen={isBookingOpen} onClose={handleBookingClose} />
-
-      <AnimatePresence>
-        {confirmState ? (
-          <motion.div
-            className={styles.confirm}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-          >
-            <ConfirmationParticles />
-            <div className={styles.confirmRing}>
-              <div className={styles.confirmRingTrack} />
-              <div className={styles.confirmRingSpinner} />
-            </div>
-            <h2 className={styles.confirmTitle}>Ритуал забронирован</h2>
-            <div className={styles.confirmDetails}>
-              <p className={styles.confirmService}>{confirmState.service?.title}</p>
-              <div className={styles.confirmMeta}>
-                <span>{formatBookingDate(confirmState.date)}</span>
-                {confirmState.totalPrice ? (
-                  <span>{confirmState.totalPrice.toLocaleString('ru-RU')} ₽</span>
-                ) : null}
-              </div>
-            </div>
-            <div className={styles.confirmActions}>
-              <button type="button" className="btn-ink" onClick={handleConfirmClose}>
-                Готово
-              </button>
-              <button type="button" className={styles.confirmOutline} onClick={handleConfirmClose}>
-                Вернуться к услугам
-              </button>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </>
-  );
-}
-</file>
-
-<file path="src/screens/BookingScreen.module.css">
-.booking {
-  position: relative;
-  min-height: 100dvh;
-  padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + var(--tabbar-space));
-  overflow: hidden;
-  color: var(--ink);
-}
-
-.ambientGlow {
-  position: absolute;
-  width: 200%;
-  height: 200%;
-  top: -50%;
-  left: -50%;
-  filter: blur(95px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.contentLayer {
-  position: relative;
-  z-index: 1;
-}
-
-.header {
-  position: relative;
-  z-index: 2;
-  margin-bottom: 28px;
-}
-
-.kicker {
-  font-size: 11px;
-  letter-spacing: 0.3em;
-  color: var(--ink-60);
-  text-transform: uppercase;
-}
-
-.title {
-  font-family: var(--font-display);
-  font-size: 34px;
-  text-transform: lowercase;
-  margin: 4px 0 0;
-}
-
-.tabsContainer {
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
-  padding: 8px 20px 16px;
-  margin: 0 -20px;
-  overflow-x: auto;
-  overflow-y: visible;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.tabsContainer::-webkit-scrollbar {
-  display: none;
-}
-
-.tab {
-  min-height: 40px;
-  padding: 8px 14px;
-  border-radius: 22px;
-  border: none;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink);
-  white-space: nowrap;
-  transition: transform 0.2s var(--smooth), color 0.25s var(--smooth);
-  font-family: var(--font-body);
-}
-
-.activeTab {
-  color: var(--ink);
-  transform: translateY(-1px);
-}
-
-.step {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.sectionTitle {
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-style: italic;
-  margin-bottom: 4px;
-}
-
-.cardStack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.loader {
-  min-height: 140px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-transform: uppercase;
-  letter-spacing: 0.28em;
-  font-size: 11px;
-  color: var(--ink-60);
-}
-
-.bookingError {
-  margin: 18px 0 0;
-  text-align: center;
-  color: #ffb4b4;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.emptyState {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  text-align: left;
-}
-
-.emptyState p {
-  margin: 0;
-  font-size: 14px;
-  color: var(--ink-60);
-}
-
-.serviceCard {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.28s var(--smooth), background 0.28s var(--smooth), transform 0.22s var(--smooth);
-}
-
-.serviceCard:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.35);
-  outline-offset: 2px;
-}
-
-.cardContent {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  gap: 10px;
-}
-
-.serviceMetadata {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 9px;
-}
-
-.serviceTitle {
-  font-size: 15px;
-  line-height: 1.25;
-  font-weight: 500;
-  color: var(--ink);
-  margin: 0;
-}
-
-.activeCard {
-  transform: scale(0.98);
-}
-
-.serviceDuration {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.servicePrice {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.inlineBookButton {
-  width: 100%;
-  padding: 14px 0;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: var(--ink);
-  border-radius: 16px;
-  font-weight: 600;
-  font-family: var(--font-body);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.2), 0 2px 18px rgba(0, 0, 0, 0.4);
-}
-
-.selectedBar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.4);
-  border: 0.5px solid rgba(255, 255, 255, 0.85);
-  border-radius: 16px;
-  margin-bottom: 16px;
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-}
-
-.selectedTitle {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1c1c1e;
-}
-
-.selectedPrice {
-  font-size: 12px;
-  color: rgba(28, 28, 30, 0.5);
-}
-
-.dateStrip {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  scroll-snap-type: x mandatory;
-}
-
-.dateChip {
-  min-width: 100px;
-  padding: 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.65);
-  scroll-snap-align: start;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.dateActive {
-  background: var(--ink);
-  color: #fff;
-}
-
-.dateNum {
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.dateWeek {
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.slot {
-  padding: 18px 0;
-  border-radius: 18px;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  font-weight: 500;
-  transition: transform 0.25s var(--spring), background 0.3s;
-}
-
-.slot:active {
-  transform: scale(0.94);
-}
-
-.slotBusy {
-  opacity: 0.4;
-  text-decoration: line-through;
-}
-
-.slotActive {
-  background: var(--ink);
-  color: white;
-}
-
-.confirm {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  padding: 60px 30px 40px;
-  background: #111820;
-  color: white;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-}
-
-.confirmLogo {
-  width: 120px;
-  height: auto;
-}
-
-.confirmRing {
-  position: relative;
-  width: 120px;
-  height: 120px;
-}
-
-.confirmRingTrack,
-.confirmRingSpinner {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.confirmRingSpinner {
-  border-top-color: rgba(255, 255, 255, 0.7);
-  border-left-color: transparent;
-  animation: spin 8s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.confirmTitle {
-  font-family: var(--font-display);
-  font-size: 34px;
-  margin: 0;
-}
-
-.confirmDetails {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.confirmService {
-  font-size: 16px;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.confirmMeta {
-  font-size: 13px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}
-
-.confirmActions {
-  margin-top: 32px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.confirmOutline {
-  border-radius: var(--radius-pill);
-  padding: 14px 28px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.7);
-  background: transparent;
-}
-
-.selectedBar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.4);
-  border: 0.5px solid rgba(255, 255, 255, 0.85);
-  border-radius: 16px;
-  margin-bottom: 16px;
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-}
-</file>
-
-<file path="src/screens/HomeScreen.jsx">
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import Marquee from '../components/Marquee.jsx';
-import ServiceDrawer from '../components/ServiceDrawer.jsx';
-import { useVK } from '../contexts/VKContext.jsx';
-import styles from './HomeScreen.module.css';
-
-const CATEGORIES = [
-  { id: 'nails', label: 'Маникюр' },
-  { id: 'solarium', label: 'Солярий' },
-  { id: 'extra', label: 'Дополнительно' }
-];
-
-const SERVICES_DATA = {
-  nails: {
-    title: 'Chrome Couture Маникюр',
-    description:
-      'Аппаратные техники, жидкие металлы и сложные покрытия под цвет вашего гардероба. Каждое покрытие фиксируется в карте клиента.',
-    price: 'от 2 200 ₽',
-    link: ''
-  },
-  solarium: {
-    title: 'Natasha Solarium Program',
-    description:
-      'Индивидуальные протоколы загара с подбором фильтров, SPF-этикета и режимов после солнечного бара. Золотистый оттенок без перегрева.',
-    price: 'от 1 500 ₽',
-    link: ''
-  },
-  extra: {
-    title: 'Дополнительные ритуалы',
-    description:
-      'Спа для рук, массаж кистей и экспресс-уходы, которые усиливают основной визит. Созданы для длинных вечеров и премиальных событий.',
-    price: 'от 900 ₽',
-    link: ''
-  }
-};
-
-export default function HomeScreen() {
-  const { triggerHaptic } = useVK();
-  const [activeCategory, setActiveCategory] = useState('nails');
-  const [activeService, setActiveService] = useState(null);
-  const [timeTint, setTimeTint] = useState('rgba(0,0,0,0)');
-  const now = new Date();
-  const localizedDate = now.toLocaleDateString('ru-RU', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long'
-  });
-
-  useEffect(() => {
-    const h = new Date().getHours();
-    let tint;
-    if (h >= 5 && h < 11) {
-      tint = 'rgba(76, 29, 149, 0.28)';
-    } else if (h >= 11 && h < 17) {
-      tint = 'rgba(15, 15, 35, 0.3)';
-    } else if (h >= 17 && h < 21) {
-      tint = 'rgba(120, 53, 15, 0.35)';
-    } else {
-      tint = 'rgba(0, 0, 0, 0.45)';
-    }
-    setTimeTint(tint);
-  }, []);
-
-  useEffect(() => {
-    if (!activeService) return undefined;
-
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = overflow;
-    };
-  }, [activeService]);
-
-  const handleCategorySelect = (id) => {
-    triggerHaptic('light');
-    setActiveCategory(id);
-    setActiveService(id);
-  };
-
-  return (
-    <div className={styles.home}>
-      <div className={styles.heroPhoto}>
-        <div className={styles.heroBackdrop} aria-hidden="true" />
-        <div className={styles.heroNoise} aria-hidden="true" />
-        <div className={styles.heroFade} />
-        <div
-          className={styles.heroTint}
-          style={{ background: timeTint }}
-        />
-        <div className={styles.logoCenter}>NATASHA NAILS LAB</div>
-        <span className={styles.datePill}>{localizedDate}</span>
-
-        <div className={styles.content}>
-          <div className={styles.categories}>
-            {CATEGORIES.map((cat) => (
-              <motion.button
-                key={cat.id}
-                whileTap={{ scale: 0.96 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                className={`${styles.categoryChip} glass-panel ${activeCategory === cat.id ? `${styles.categoryActive} glass-panel-active` : ''}`}
-                onClick={() => handleCategorySelect(cat.id)}
-              >
-                {cat.label}
-              </motion.button>
-            ))}
-          </div>
-
-          <Marquee speed={30} />
-        </div>
-      </div>
-
-      <ServiceDrawer
-        isOpen={!!activeService}
-        onClose={() => setActiveService(null)}
-        data={activeService ? SERVICES_DATA[activeService] : null}
-      />
-    </div>
-  );
-}
-</file>
-
-<file path="src/screens/HomeScreen.module.css">
-.home {
-  position: relative;
-  width: 100%;
-  min-height: 100dvh;
-  color: var(--ink);
-}
-
-.heroPhoto {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.heroBackdrop {
-  position: absolute;
-  inset: -10% -10% 0;
-  width: 120%;
-  height: 120%;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(76, 29, 149, 0.6), transparent 55%),
-    radial-gradient(circle at 80% 60%, rgba(120, 53, 15, 0.5), transparent 60%),
-    linear-gradient(135deg, #040404, #161623);
-  filter: blur(8px);
-  animation: chromeDrift 26s ease-in-out infinite alternate;
-}
-
-.heroNoise {
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.25'/%3E%3C/svg%3E");
-  opacity: 0.15;
-  mix-blend-mode: screen;
-}
-
-.heroTint {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  mix-blend-mode: screen;
-  transition: background 3s ease;
-  pointer-events: none;
-}
-
-@keyframes chromeDrift {
-  0% {
-    transform: scale(1) translate(0, 0);
-  }
-  100% {
-    transform: scale(1.08) translate(-4%, 2%);
-  }
-}
-
-.heroFade {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60%;
-  z-index: 1;
-  background: linear-gradient(0deg, #0a0a0c 0%, rgba(10, 10, 12, 0.92) 35%, transparent 100%);
-}
-
-.logoCenter {
-  position: absolute;
-  top: 8%;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: 26px;
-  letter-spacing: 0.22em;
-  color: rgba(255, 255, 255, 0.88);
-  z-index: 2;
-  white-space: nowrap;
-}
-
-.content {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: calc(80px + var(--safe-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 3;
-  color: var(--ink);
-}
-
-.greetingRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.greeting {
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-style: italic;
-  letter-spacing: 0.05em;
-  margin: 0;
-  color: var(--ink);
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  padding-left: 18px;
-}
-
-.datePill {
-  position: absolute;
-  top: 16%;
-  right: 18px;
-  z-index: 2;
-  padding: 6px 12px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.slotCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 16px;
-  border-radius: 20px;
-  position: relative;
-  overflow: hidden;
-  background: rgba(10, 10, 12, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(26px);
-  -webkit-backdrop-filter: blur(26px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 12px 30px rgba(0, 0, 0, 0.45);
-}
-
-.slotCard::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at center, rgba(255, 210, 183, 0.35), transparent 60%);
-  opacity: 0;
-  transform: scale(0.5);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.slotCard:active::after {
-  opacity: 1;
-  transform: scale(1.4);
-}
-
-.slotLabel {
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-60);
-}
-
-.slotTime {
-  font-family: var(--font-display);
-  font-size: 22px;
-  margin: 4px 0;
-  color: var(--ink);
-}
-
-.slotMeta {
-  font-size: 11px;
-  color: var(--ink-60);
-}
-
-.slotCard :global(.btn-ink) {
-  background: transparent;
-  color: var(--ink);
-  padding: 8px 16px;
-  font-size: 13px;
-}
-
-.categories {
-  display: flex;
-  gap: 8px;
-}
-
-.categoryChip {
-  flex: 1;
-  border-radius: 24px;
-  min-height: 42px;
-  padding: 10px 14px;
-  border: none;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.65);
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  transition: transform 0.2s var(--smooth), color 0.25s var(--smooth), box-shadow 0.25s var(--smooth);
-}
-
-.categoryActive {
-  color: var(--ink);
-  transform: translateY(-1px);
-}
-
-.countdownWrap {
-  box-shadow: 0 -8px 32px rgba(245, 240, 232, 0.8);
-  border-radius: 22px;
-}
-
-.countdownCard {
-  background: rgba(28, 28, 30, 0.82);
-  border-radius: 22px;
-  padding: 20px;
-  color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 -20px 40px rgba(245, 240, 232, 0.6);
-}
-
-.countLabel {
-  font-size: 12px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
-.countValue {
-  font-family: var(--font-display);
-  font-size: 22px;
-  margin: 12px 0;
-}
-</file>
-
-<file path="src/screens/InfoScreen.jsx">
-import { motion } from 'framer-motion';
-import SplitText from '../components/SplitText.jsx';
-import styles from './InfoScreen.module.css';
-
-const GALLERY = [
-  { id: 'atelier', title: 'Atelier зона', description: 'Хромированные поверхности, мягкий свет и индивидуальные кресла.', accent: 'rgba(76, 29, 149, 0.45)' },
-  { id: 'ritual', title: 'Ritual lab', description: 'Солярий нового поколения с системой охлаждения и бронзовым свечением.', accent: 'rgba(120, 53, 15, 0.45)' },
-  { id: 'lounge', title: 'Lounge', description: 'Приватный кофейный угол и ароматерапия перед процедурой.', accent: 'rgba(255, 255, 255, 0.15)' }
-];
-
-const LINKS = [{ label: 'ВКонтакте', url: 'https://vk.com/natasha_premium_lab' }];
-
-export default function InfoScreen() {
-  const handleOpenExternal = (url) => {
-    if (!url) return;
-    window.open(url, '_blank');
-  };
-
-  return (
-    <div className={styles.info}>
-      <motion.div
-        className={styles.ambientGlow}
-        animate={{
-          background: 'radial-gradient(circle at 25% 25%, rgba(76, 29, 149, 0.45), transparent 60%), radial-gradient(circle at 80% 70%, rgba(120, 53, 15, 0.4), transparent 65%), #0a0a0c'
-        }}
-        transition={{ duration: 0.8, ease: 'easeInOut' }}
-      />
-      <div className={styles.inner}>
-        <div className={styles.heading}>
-          <SplitText text="О Natasha Beauty Lab" className={styles.title} delay={0.1} />
-        </div>
-
-        <div className={styles.galleryRow}>
-          {GALLERY.map((card) => (
-            <div key={card.id} className={`${styles.galleryCard} glass-panel`}>
-              <div
-                className={styles.galleryGlow}
-                style={{
-                  background:
-                    `radial-gradient(circle at 30% 20%, ${card.accent}, transparent 60%), radial-gradient(circle at 75% 70%, rgba(120, 53, 15, 0.35), transparent 65%), #0b0b0e`
-                }}
-              />
-              <div className={styles.galleryMeta}>
-                <p>{card.title}</p>
-                <span>{card.description}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className={`${styles.card} glass-panel`}>
-          <p className={styles.cardLabel}>Контакты</p>
-          <p className={styles.cardValue}>Адрес: (В процессе добавления)</p>
-          <p className={styles.cardValue}>пн–вс · 10:00—20:00</p>
-          <a href="tel:+70000000000" className={styles.cardLink}>+7 (000) 000-00-00</a>
-        </div>
-
-        <div className={`${styles.card} glass-panel`}>
-          <p className={styles.cardLabel}>О мастере</p>
-          <p className={styles.quote}>
-            Информация о мастере обновляется...
-          </p>
-        </div>
-
-        <div className={styles.links}>
-          {LINKS.map((link) => (
-            <button
-              key={link.label}
-              type="button"
-              className={`${styles.link} glass-panel`}
-              onClick={() => handleOpenExternal(link.url)}
-            >
-              <span>{link.label}</span>
-              <svg viewBox="0 0 24 24">
-                <path d="M7 17 17 7M7 7h10v10" />
-              </svg>
-            </button>
-          ))}
-        </div>
-
-        <div className={`${styles.card} glass-panel`}>
-          <p className={styles.cardLabel}>Политика конфиденциальности</p>
-          <p className={styles.cardValue}>
-            Настоящая политика описывает, как Natasha Beauty Lab собирает, использует и защищает персональные данные пользователей приложения.
-          </p>
-          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Какие данные мы собираем</p>
-          <p className={styles.cardValue}>
-            Имя и идентификатор ВКонтакте — для персонализации и истории визитов. Дата и время записи — для управления расписанием. Мы не собираем номера карт, пароли и геолокацию.
-          </p>
-          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Как мы используем данные</p>
-          <p className={styles.cardValue}>
-            Данные используются исключительно для записи к мастеру, отправки напоминаний и ведения истории визитов. Данные не передаются третьим лицам и не используются в рекламных целях.
-          </p>
-          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Хранение данных</p>
-          <p className={styles.cardValue}>
-            Данные хранятся на серверах Yandex Cloud на территории Российской Федерации в соответствии с требованиями ФЗ-152 «О персональных данных».
-          </p>
-          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Ваши права</p>
-          <p className={styles.cardValue}>
-            Вы можете запросить удаление своих данных, написав администратору через ВКонтакте. Данные будут удалены в течение 3 рабочих дней.
-          </p>
-          <p className={styles.cardValue} style={{ marginTop: 12, fontSize: 11, opacity: 0.5 }}>
-            Последнее обновление: апрель 2026 г.
-          </p>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/screens/InfoScreen.module.css">
-.info {
-  position: relative;
-  height: 100dvh;
-  overflow: hidden;
-  color: var(--ink);
-}
-
-.ambientGlow {
-  position: absolute;
-  width: 200%;
-  height: 200%;
-  top: -50%;
-  left: -50%;
-  z-index: 0;
-  pointer-events: none;
-  filter: blur(95px);
-}
-
-.inner {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  height: 100%;
-  overflow-y: auto;
-  padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + var(--tabbar-space));
-  scrollbar-width: none;
-  overscroll-behavior: contain;
-}
-
-.inner > * {
-  flex-shrink: 0;
-}
-
-.inner::-webkit-scrollbar {
-  display: none;
-}
-
-.heading {
-  margin-bottom: 8px;
-}
-
-.title {
-  font-family: var(--font-display);
-  font-size: 32px;
-  letter-spacing: 0.08em;
-}
-
-.galleryRow {
-  display: flex;
-  gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-.galleryCard {
-  flex: 0 0 220px;
-  height: 280px;
-  border-radius: 18px;
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-}
-
-.galleryGlow {
-  position: absolute;
-  inset: 0;
-  filter: blur(22px);
-}
-
-.galleryMeta {
-  position: relative;
-  width: 100%;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 1;
-}
-
-.galleryMeta p {
-  margin: 0;
-  font-size: 18px;
-  font-family: var(--font-display);
-}
-
-.galleryMeta span {
-  font-size: 13px;
-  color: var(--ink-60);
-}
-
-.card {
-  padding: 20px;
-}
-
-.cardLabel {
-  font-size: 12px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--ink-60);
-  margin-bottom: 8px;
-}
-
-.cardValue {
-  font-size: 15px;
-  margin: 2px 0;
-  color: var(--ink);
-}
-
-.cardLink {
-  margin-top: 8px;
-  font-size: 15px;
-  color: var(--ink);
-  text-decoration: underline;
-}
-
-.quote {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-style: italic;
-  line-height: 1.4;
-  color: var(--ink-60);
-}
-
-.links {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.link {
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 15px;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.link svg {
-  width: 20px;
-  height: 20px;
-  stroke: var(--ink);
-  fill: none;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-</file>
-
-<file path="src/screens/MasterScreen.module.css">
-.master {
-  position: relative;
-  min-height: 100dvh;
-  padding-bottom: 80px;
-  overflow-y: auto;
-}
-
-.ambientGlow {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.inner {
-  position: relative;
-  z-index: 1;
-  padding: 24px 16px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.kicker {
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  color: var(--ink-60);
-  text-transform: uppercase;
-}
-
-.title {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--ink-100);
-  margin: 0;
-}
-
-.tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.tab {
-  padding: 12px;
-  border-radius: 14px;
-  border: none;
-  background: transparent;
-  color: var(--ink-60);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.tabActive {
-  color: var(--ink-100);
-}
-
-.tabContent {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.groupLabel {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: var(--ink-60);
-  margin: 8px 0 4px;
-}
-
-.card {
-  padding: 14px 16px;
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.cardHighlight {
-  border-left: 3px solid rgba(76, 29, 149, 0.8);
-}
-
-.cardMuted {
-  opacity: 0.6;
-}
-
-.cardRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.cardTitle {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink-100);
-  margin: 0;
-}
-
-.cardPrice {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink-100);
-  white-space: nowrap;
-  margin: 0;
-}
-
-.cardSub {
-  font-size: 12px;
-  color: var(--ink-60);
-  margin: 0;
-}
-
-.editRow {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-.editInput {
-  flex: 1;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--ink-100);
-  font-size: 14px;
-}
-
-.btnEdit {
-  font-size: 12px;
-  color: var(--ink-60);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  margin-top: 2px;
-  text-align: left;
-}
-
-.btnSave {
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: none;
-  background: rgba(76, 29, 149, 0.7);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btnCancel {
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--ink-60);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.empty {
-  text-align: center;
-  color: var(--ink-60);
-  font-size: 14px;
-  padding: 30px 0;
-}
-
-.denied {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  font-size: 16px;
-  color: var(--ink-60);
-}
-
-.actionsRow {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-
-.btnAdd {
-  width: 100%;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px dashed rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.04);
-  color: var(--ink-60);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btnDelete {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: none;
-  background: rgba(220,38,38,0.7);
-  color: #fff;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.btnDeleteSoft {
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: none;
-  background: rgba(255,255,255,0.06);
-  color: var(--ink-60);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.hiddenBadge {
-  font-size: 10px;
-  background: rgba(255,255,255,0.1);
-  padding: 2px 6px;
-  border-radius: 6px;
-  margin-left: 6px;
-  vertical-align: middle;
-  color: var(--ink-60);
-}
-</file>
-
 <file path="src/screens/OnboardingScreen.jsx">
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -4125,7 +1836,7 @@ export default function OnboardingScreen({ onComplete }) {
 
         <button
           type="button"
-          className="btn-ink glass-panel"
+          className="btn-ink"
           onClick={handleNext}
           style={{ opacity: isLastSlide && !agreed ? 0.4 : 1, transition: 'opacity 0.2s' }}
         >
@@ -4279,121 +1990,1144 @@ export default function OnboardingScreen({ onComplete }) {
 }
 </file>
 
-<file path="src/screens/PortfolioScreen.jsx">
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import SplitText from '../components/SplitText.jsx';
-import Marquee from '../components/Marquee.jsx';
-import LocalLazyImage from '../components/LocalLazyImage.jsx';
-import { asset } from '../utils/assetUrl.js';
-import styles from './PortfolioScreen.module.css';
+<file path="src/utils/assetUrl.js">
+export const asset = (path) => import.meta.env.BASE_URL + path.replace(/^\//, '');
+</file>
 
-const LANES = [
-  {
-    id: 'nails',
-    label: 'Маникюр',
-    color: 'rgba(76, 29, 149, 0.12)',
-    items: [
-      { title: 'Chromed Tips', description: 'металлический френч · 120 минут', accent: 'linear-gradient(135deg, #4c1d95, #a855f7)', image: '/portfolio/nails-chrome.webp' },
-      { title: 'Mirror Glaze', description: 'жидкое золото · 90 минут', accent: 'linear-gradient(135deg, #b45309, #fde68a)', image: '/portfolio/nails-mirror.webp' },
-      { title: 'Liquid Obsidian', description: 'черный лак с бронзой · 75 минут', accent: 'linear-gradient(135deg, #0f0f15, #78350f)', image: '/portfolio/nails-obsidian.webp' }
-    ]
+<file path="src/utils/config.js">
+export const API_URL = 'https://functions.yandexcloud.net/d4eb8ife6rqecrip6jp3';
+</file>
+
+<file path="src/utils/haptic.js">
+import bridge from '@vkontakte/vk-bridge';
+
+export const haptic = {
+  light: () => bridge.send('VKWebAppTapticImpactOccurred', { style: 'light' }).catch(() => {}),
+  medium: () => bridge.send('VKWebAppTapticImpactOccurred', { style: 'medium' }).catch(() => {}),
+  success: () => bridge.send('VKWebAppTapticNotificationOccurred', { type: 'success' }).catch(() => {}),
+  select: () => bridge.send('VKWebAppTapticSelectionChanged', {}).catch(() => {})
+};
+</file>
+
+<file path="vite.config.js">
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+const enableHttps = process.env.VITE_DEV_HTTPS === 'true';
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/natasha-nails-app/',
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    https: enableHttps
   },
-  {
-    id: 'solarium',
-    label: 'Солярий',
-    color: 'rgba(120, 53, 15, 0.16)',
-    items: [
-      { title: 'Pulse Bronze', description: '8 минут · режим evening', accent: 'linear-gradient(135deg, #78350f, #f97316)', image: '/portfolio/solarium-pulse.webp' },
-      { title: 'Nordic Glow', description: '12 минут · режим delicate', accent: 'linear-gradient(135deg, #1d1f2b, #4c1d95)', image: '/portfolio/solarium-nordic.webp' },
-      { title: 'After-Sun Mist', description: 'уход и охлаждение', accent: 'linear-gradient(135deg, #0f172a, #155e75)', image: '/portfolio/solarium-mist.webp' }
-    ]
-  },
-  {
-    id: 'extra',
-    label: 'Дополнительно',
-    color: 'rgba(255, 255, 255, 0.08)',
-    items: [
-      { title: 'Hand Spa', description: 'омолаживающая маска', accent: 'linear-gradient(135deg, #312e81, #4c1d95)', image: '/portfolio/extra-spa.webp' },
-      { title: 'Chrome Detox', description: 'скраб + массаж', accent: 'linear-gradient(135deg, #0f0f15, #27272a)', image: '/portfolio/extra-detox.webp' },
-      { title: 'Event Kit', description: 'уход за домом', accent: 'linear-gradient(135deg, #78350f, #fde68a)', image: '/portfolio/extra-kit.webp' }
-    ]
+  build: {
+    outDir: 'dist',
+    assetsInlineLimit: 0
   }
-];
+});
+</file>
 
-export default function PortfolioScreen() {
-  const [activeLane, setActiveLane] = useState(null);
+<file path="vk-hosting-config.json">
+{
+  "static_path": "dist",
+  "endpoint_main": "index.html",
+  "endpoint_mobile": "index.html",
+  "app_id": 0
+}
+</file>
+
+<file path=".gitignore">
+node_modules
+dist
+.vite
+.DS_Store
+*.log
+repomix-output.xml
+</file>
+
+<file path="PROJECT_BRAIN.md">
+# NATASHA NAILS APP — PROJECT BRAIN
+
+## Стек
+- React + Vite, VK Mini App
+- Yandex Cloud Functions (Node.js 22, ESM)
+- YDB Serverless (natasha-db)
+- Framer Motion, Three.js (rings на Home)
+- НЕТ Zustand — стейт через useState + VKContext
+
+## API
+- URL: https://functions.yandexcloud.net/d4eb8ife6rqecrip6jp3
+- GET → { services: [...] }
+- POST → { service_id, client_id, date, totalPrice } → { ok, appointment_id }
+- Сервисный аккаунт: natasha-api-sa (ydb.editor)
+- Env: YDB_ENDPOINT, YDB_DATABASE
+
+## Схема YDB
+- services: id(Utf8), category(Utf8), title(Utf8), price(Int32), duration_minutes(Int32)
+- appointments: id(Utf8), client_id(Utf8), service_id(Utf8), appointment_date(Datetime), status(Utf8), total_price(Int32)
+- clients: id(Utf8), vk_id(Utf8), first_name(Utf8), phone(Utf8), registered_at(Datetime)
+
+## Критичные решения (не менять)
+- extractValue() парсит protobuf через JSON.parse(JSON.stringify(cell)) — без этого int32 читается как пустая строка
+- appointment_date пишется через CAST("..." AS Datetime), формат: 2026-04-21T00:12:54Z
+- total_price: CAST(N AS Int32)
+- package.json функции: оставить @yandex-cloud/nodejs-sdk, не удалять
+
+## Экраны
+- Home — категории + ServiceDrawer, данные хардкод (не из API)
+- Booking — услуги из API, POST запись, hasModifiers → ServiceConstructor
+- Portfolio — статичный
+- Info — статичный
+- Profile — VK user, BeautyCard, CareAccordion (советы), кнопка написать админу
+
+## Навигация
+- Простой useState route в App.jsx — НЕ менять на router, сломает VK Bridge
+
+## КЛАДБИЩЕ
+- TypedData.asRows — не существует в ydb-sdk v5
+- .nativeObjects — возвращает пустой результат
+- 'textValue' in cell без JSON.parse — всегда true из-за protobuf прототипа
+- Параметризованные запросы с typeId — не работают, использовать inline CAST
+- LEFT JOIN без AS возвращает колонки с префиксом "a.id" — всегда писать явные алиасы AS
+
+## Текущий фокус
+- ~~Этап 1: ProfileScreen — история визитов~~ ✅
+- ~~Этап 2: MasterScreen — записи + полный CRUD услуг~~ ✅
+- ~~Этап 3: Политика конфиденциальности + онбординг~~ ✅
+- ~~Деплой GitHub Pages~~ ✅
+- VK Dev: создано приложение ID 54555974, URL вставлен ✅
+- Ожидаем иконки от дизайнера → загрузить в Оформление → подать на модерацию
+- Этап 4: Уведомления VK Notify (после модерации)
+- Этап 5: Master Analytics (In-App дашборд с премиальным UI для просмотра статистики: выручка, клиенты, топ услуг. Интеграция с YDB)
+- Этап 6: Визуальный рефакторинг (Quiet Luxury & Clean Editorial)
+- Вкладка «Портфолио» утверждена к удалению.
+
+## VK App
+- App ID: 54555974
+- URL: https://selemenev9-ui.github.io/natasha-nails-app/
+- Группа: Natasha Premium Lab
+- Статус: Непроверенное, доступно по ссылке
+
+## Схема services (обновлено)
+- is_active (Bool) — скрыть без удаления
+- Клиентский GET возвращает только is_active=true
+- Мастерский GET: ?action=all_services — все включая скрытые
+
+## MASTER_IDS
+- ['80557585', '187729875', '123456789']
+- 123456789 — тестовый локалхост, убрать перед финальным деплоем
+
+## Деплой
+-  задеплоено в VK (есть группа, передать Наташе позже)
+- Локально: npm run dev
+- **Правило:** `npm run deploy` / публикации в `gh-pages` запускать **только после явного разрешения Наташи** (никаких самостоятельных деплоев во время экспериментов).
+</file>
+
+<file path="README.md">
+# Natasha Nails App — VK Mini App
+
+Приложение для записи к мастеру ногтевого сервиса и солярия.
+
+## Стек
+- React + Vite
+- VK Bridge
+- Framer Motion
+- Yandex Cloud Functions + YDB Serverless
+
+## Локальная разработка
+npm install
+npm run dev
+
+## Деплой
+npm run deploy
+</file>
+
+<file path="src/App.jsx">
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+
+import BookingScreen from './screens/BookingScreen.jsx';
+import InfoScreen from './screens/InfoScreen.jsx';
+import ProfileScreen from './screens/ProfileScreen.jsx';
+import MasterScreen from './screens/MasterScreen.jsx';
+import OnboardingScreen from './screens/OnboardingScreen.jsx';
+import TabBar from './components/TabBar.jsx';
+import { useVK } from './contexts/VKContext.jsx';
+
+/**
+ * Routes map. We use internal state for simplicity; @vkontakte/vk-mini-apps-router
+ * is wired as a dependency and can be swapped in here for hash-based routing
+ * when the app is published inside VK.
+ */
+const ROUTES = ['booking', 'info', 'profile', 'master'];
+
+const pageVariants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } },
+  exit: { opacity: 0, transition: { duration: 0.2, ease: 'easeIn' } }
+};
+
+function SplashScreen() {
+  return (
+    <motion.div
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.8, ease: 'easeOut' } }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: '#000000',
+        display: 'grid',
+        placeItems: 'center',
+        zIndex: 999,
+        pointerEvents: 'none'
+      }}
+    >
+      <motion.span
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 1.04, transition: { duration: 0.8, ease: 'easeInOut' } }}
+        transition={{ duration: 1.5, ease: 'easeOut' }}
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '28px',
+          letterSpacing: '0.45em',
+          color: '#FFFFFF',
+          textTransform: 'uppercase'
+        }}
+      >
+        NATASHA LAB
+      </motion.span>
+    </motion.div>
+  );
+}
+
+export default function App() {
+  const { isBridgeLoading, isFirstVisit, completeOnboarding } = useVK();
+  const [route, setRoute] = useState('profile');
+  const [isConfirm, setIsConfirm] = useState(false);
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
+  const currentScreen = route;
+
+  const navigate = (next) => {
+    if (!ROUTES.includes(next)) return;
+    setRoute(next);
+  };
+
+  useEffect(() => {
+    if (isBridgeLoading) {
+      setIsSplashVisible(true);
+      return;
+    }
+    const timeout = setTimeout(() => setIsSplashVisible(false), 1200);
+    return () => clearTimeout(timeout);
+  }, [isBridgeLoading]);
+
+  const showSplash = isBridgeLoading || isSplashVisible;
+
+  if (isFirstVisit) {
+    return (
+      <div className="app-shell">
+        <OnboardingScreen onComplete={completeOnboarding} />
+        <AnimatePresence>{showSplash && <SplashScreen key="splash" />}</AnimatePresence>
+      </div>
+    );
+  }
 
   return (
-    <div className={styles.portfolio}>
-      <motion.div
-        className={styles.ambientGlow}
-        animate={{
-          background: 'radial-gradient(circle at 20% 20%, rgba(76, 29, 149, 0.45), transparent 60%), radial-gradient(circle at 80% 70%, rgba(120, 53, 15, 0.4), transparent 65%), #0a0a0c'
-        }}
-        transition={{ duration: 0.8, ease: 'easeInOut' }}
-      />
+    <div className="app-shell">
+      <div className="material" />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentScreen}
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          style={{ width: '100%', height: '100%' }}
+        >
+          {currentScreen === 'booking' && <BookingScreen onNavigate={navigate} onConfirmChange={setIsConfirm} />}
+          {currentScreen === 'info' && <InfoScreen />}
+          {currentScreen === 'profile' && <ProfileScreen />}
+          {currentScreen === 'master' && <MasterScreen />}
+        </motion.div>
+      </AnimatePresence>
 
-      <div
-        className={styles.bgOverlay}
-        style={{ background: activeLane ? activeLane.color : 'transparent' }}
-      />
+      <TabBar active={route} onChange={navigate} isHidden={isConfirm} />
 
-      <div className={styles.inner}>
-        <div className={styles.header}>
-          <span className={styles.kicker}>галерея</span>
-          <SplitText text="портфолио" className={styles.title} delay={0.1} />
-        </div>
-
-        {LANES.map((lane, laneIndex) => (
-          <div key={lane.id}>
-            {laneIndex === 1 && <Marquee reverse speed={40} />}
-
-            <div className={styles.lane}>
-              <div className={styles.laneHeader}>
-                <span className={styles.laneTitle}>{lane.label}</span>
-                <div
-                  className={styles.laneAccent}
-                  style={{
-                    background: activeLane?.id === lane.id ? lane.color : 'transparent'
-                  }}
-                />
-              </div>
-
-              <div className={styles.laneScroll}>
-                {lane.items.map((item) => (
-                  <motion.div
-                    key={item.title}
-                    className={`${styles.card} glass-panel`}
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-                    onTapStart={() => setActiveLane(lane)}
-                  >
-                    <LocalLazyImage className={styles.cardImage} src={asset(item.image)} alt={item.title} />
-                    <div className={styles.cardAura} />
-                    <div className={styles.cardCopy}>
-                      <p>{item.title}</p>
-                      <span>{item.description}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <AnimatePresence>{showSplash && <SplashScreen key="splash" />}</AnimatePresence>
     </div>
   );
 }
 </file>
 
-<file path="src/screens/PortfolioScreen.module.css">
-.portfolio {
+<file path="src/components/BeautyCard.module.css">
+.perspectiveWrap {
+  width: 100%;
+  height: 100%;
+  perspective: 1000px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+}
+
+.perspectiveWrap:focus-visible {
+  outline: 2px solid rgba(20, 20, 20, 0.3);
+  outline-offset: 6px;
+}
+
+
+.card {
+  position: relative;
+  width: min(100%, 340px);
+  height: 200px;
+  transform-style: preserve-3d;
+}
+
+.frontFace,
+.backFace {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  backface-visibility: hidden;
+  background: #141414 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2) !important;
+  overflow: hidden;
+}
+
+.frontFace::after,
+.backFace::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+.card.light,
+.card.dark {
+  color: #FFFFFF;
+}
+
+.backFace {
+  color: var(--cream);
+  justify-content: flex-start;
+}
+
+.magneticStrip {
+  width: 100%;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.85);
+  margin-top: 24px;
+  border-radius: 16px 16px 0 0;
+}
+
+.backContent {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: calc(100% - 40px);
+  gap: 12px;
+}
+
+.backContent p {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+}
+
+.levitate {
+  position: relative;
+  z-index: 3;
+  transform: translateZ(30px);
+}
+
+
+.brand {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.5) !important;
+  text-transform: uppercase;
+}
+
+.name {
+  align-self: flex-start;
+  margin-top: auto;
+  margin-bottom: 4px;
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1.1;
+  text-align: left;
+  color: #FFFFFF !important;
+}
+
+.bottomRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+.status {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.4) !important;
+  text-transform: uppercase;
+}
+
+.vkId {
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+.card.light .frontFace .brand,
+.card.light .frontFace .name,
+.card.light .frontFace .status,
+.card.light .frontFace .vkId,
+.card.dark .frontFace .brand,
+.card.dark .frontFace .name,
+.card.dark .frontFace .status,
+.card.dark .frontFace .vkId {
+  color: inherit;
+}
+
+
+.glare,
+.rim,
+.grain,
+.sweep {
+  display: none !important;
+}
+
+.rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  transition: box-shadow 0.18s ease-out;
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.06;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px),
+    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px),
+    radial-gradient(circle at 40% 70%, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px);
+  background-size: 9px 9px, 11px 11px, 13px 13px;
+  mix-blend-mode: soft-light;
+}
+
+.sweep {
+  position: absolute;
+  inset: -20% -80%;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0) 62%);
+  transform: translateX(-120%);
+  animation: sweep-in 1.15s ease-out 0.2s both;
+}
+
+.dark .grain {
+  opacity: 0.08;
+}
+
+.dark .sweep {
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0) 38%, rgba(255, 230, 190, 0.2) 50%, rgba(255, 255, 255, 0) 62%);
+}
+
+@keyframes sweep-in {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+
+  22% {
+    opacity: 0.85;
+  }
+
+  70% {
+    opacity: 0.28;
+  }
+
+  100% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+.gyroPrompt,
+.gyroHint {
+  position: absolute;
+  inset: auto 16px 16px;
+  z-index: 4;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.gyroPrompt {
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.35);
+  color: var(--ink);
+  padding: 10px 18px;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.gyroHint {
+  margin: 0;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+</file>
+
+<file path="src/components/BookingModal.module.css">
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 24px 20px calc(var(--safe-bottom, 0px) + 24px);
+  background: rgba(2, 2, 6, 0.7);
+  backdrop-filter: blur(20px);
+}
+
+.sheet {
+  width: min(520px, 100%);
+  border-radius: 32px 32px 24px 24px;
+  border: 1px solid rgba(28, 27, 26, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 28px 80px rgba(28, 27, 26, 0.12);
+  padding: 28px 24px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--ink);
+}
+
+.closeButton {
+  align-self: center;
+  border: 1px solid rgba(28, 27, 26, 0.15);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink-60);
+  border-radius: 999px;
+  padding: 10px 26px;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.closeButton:active {
+  transform: translateY(1px);
+}
+
+.placeholder {
+  border-radius: 20px;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  padding: 24px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-60);
+  background: linear-gradient(135deg, rgba(212, 197, 179, 0.35), rgba(247, 245, 240, 0.85));
+}
+</file>
+
+<file path="src/components/ServiceConstructor.module.css">
+.container {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.categoryBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.categoryTitle {
+  font-size: 13px;
+  color: var(--ink-60);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.optionsGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.optionCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-radius: 16px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.5);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(28, 27, 26, 0.02);
+}
+
+.optionCardActive {
+  background: var(--ink) !important;
+  border-color: var(--ink) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(28, 27, 26, 0.15) !important;
+}
+
+.optionCardActive .optionLabel,
+.optionCardActive .optionPrice {
+  color: #FFFFFF !important;
+}
+
+.optionLabel {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.optionPrice {
+  font-size: 13px;
+  color: var(--ink-60);
+  font-weight: 500;
+}
+
+.bookButton {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.bookButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</file>
+
+<file path="src/components/TabBar.module.css">
+.bar {
+  position: fixed;
+  bottom: 14px;
+  left: 8px;
+  right: 8px;
+  margin: 0 auto;
+  width: calc(100% - 16px);
+  max-width: 414px;
+  padding: 8px 10px calc(var(--safe-bottom) + 8px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 28px;
+  z-index: 40;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(30px) saturate(140%);
+  -webkit-backdrop-filter: blur(30px) saturate(140%);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-height: 46px;
+  padding: 6px 2px 4px;
+  border-radius: 14px;
+  font-size: 12px;
+  color: var(--ink-60);
+  transition: color 0.3s var(--smooth), transform 0.2s var(--smooth);
+}
+
+.tab:active {
+  transform: translateY(1px);
+}
+
+.active {
+  color: var(--ink);
+}
+
+.iconWrap {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  transition: background 0.3s var(--smooth);
+}
+
+.active .iconWrap {
+  background: rgba(28, 27, 26, 0.08);
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.5;
+  transition: opacity 0.3s var(--smooth);
+}
+
+.iconActive {
+  opacity: 1;
+}
+
+.dot {
+  position: absolute;
+  bottom: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+</file>
+
+<file path="src/screens/BookingScreen.jsx">
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import ServiceConstructor from '../components/ServiceConstructor.jsx';
+import BookingModal from '../components/BookingModal.jsx';
+import ConfirmationParticles from '../components/ConfirmationParticles.jsx';
+import useViscousScroll from '../hooks/useViscousScroll.js';
+import { useVK } from '../contexts/VKContext.jsx';
+import { NAIL_MODIFIERS } from '../data/services.js';
+import { API_URL } from '../utils/config.js';
+import styles from './BookingScreen.module.css';
+
+const CATEGORY_COLORS = {
+  default: 'rgba(247, 245, 240, 0.4)',
+  nails: 'rgba(212, 197, 179, 0.55)',
+  solarium: 'rgba(140, 122, 107, 0.5)',
+  extra: 'rgba(234, 229, 222, 0.6)'
+};
+
+const CATEGORY_TEMPLATE = [
+  { id: 'nails', title: 'Маникюр & Педикюр' },
+  { id: 'solarium', title: 'Солярий' },
+  { id: 'extra', title: 'Дополнительно' }
+];
+
+export default function BookingScreen({ onConfirmChange }) {
+  const listRef = useRef(null);
+  const { triggerHaptic, user } = useVK();
+  const [categories, setCategories] = useState(() => CATEGORY_TEMPLATE.map((meta) => ({ ...meta, items: [] })));
+  const [activeService, setActiveService] = useState(null);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [bookingError, setBookingError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmState, setConfirmState] = useState(null);
+  const [selectedDate] = useState(() => new Date().toISOString());
+  useViscousScroll(listRef);
+
+  useEffect(() => {
+    onConfirmChange?.(false);
+  }, [onConfirmChange]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    async function loadServices() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(API_URL, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Ошибка ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const services = Array.isArray(payload?.services) ? payload.services : Array.isArray(payload) ? payload : null;
+        console.log('Загруженные услуги:', services);
+
+        if (!Array.isArray(services)) {
+          throw new Error('Некорректный формат данных');
+        }
+
+        const normalized = services.map((service) => ({
+          ...service,
+          category: service?.category || 'nails'
+        }));
+
+        const grouped = CATEGORY_TEMPLATE.map((meta) => ({
+          ...meta,
+          items: normalized.filter((service) => service.category === meta.id)
+        }));
+
+        if (isMounted) {
+          setCategories(grouped);
+          setActiveService(null);
+        }
+      } catch (fetchError) {
+        if (fetchError.name === 'AbortError') return;
+        if (isMounted) {
+          setError(fetchError.message || 'Не удалось загрузить услуги');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadServices();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [reloadKey]);
+
+  const handleServiceSelect = (service) => {
+    triggerHaptic('medium');
+
+    if (activeService?.id === service.id) {
+      setActiveService(null);
+      return;
+    }
+
+    setActiveService(service);
+  };
+
+  const primaryCategory = categories.find((category) => category.items?.length > 0) ?? categories[0];
+  const glowCategory = activeService?.category || primaryCategory?.id || 'default';
+
+  const getNumericPrice = (service) => {
+    if (!service) return 0;
+    if (typeof service.basePrice === 'number') return service.basePrice;
+    if (typeof service.price === 'string') {
+      const digits = parseInt(service.price.replace(/[^0-9]/g, ''), 10);
+      return Number.isNaN(digits) ? 0 : digits;
+    }
+    return 0;
+  };
+
+  const handleBookingRequest = async (payload) => {
+    if (!payload?.service) {
+      setIsBookingOpen(true);
+      return;
+    }
+
+    if (isSubmitting) return;
+    if (!payload.service?.id) {
+      setBookingError('Не удалось определить услугу. Попробуйте обновить страницу.');
+      return;
+    }
+    if (!user?.id) {
+      setBookingError('Авторизуйтесь через VK, чтобы продолжить.');
+      return;
+    }
+
+    setBookingError(null);
+    setIsSubmitting(true);
+
+    const bookingDate = payload.date || selectedDate;
+
+    const body = {
+      service_id: payload.service.id,
+      client_id: user.id,
+      date: bookingDate
+    };
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ошибка ${response.status}`);
+      }
+
+      triggerHaptic('medium');
+      setConfirmState({
+        service: payload.service,
+        date: bookingDate,
+        totalPrice: payload.totalPrice || getNumericPrice(payload.service)
+      });
+      onConfirmChange?.(true);
+    } catch (submissionError) {
+      setBookingError(submissionError.message || 'Не удалось создать запись. Попробуйте позже.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBookingClose = () => {
+    setIsBookingOpen(false);
+  };
+
+  const handleRetry = () => {
+    setReloadKey((key) => key + 1);
+  };
+
+  const handleConfirmClose = () => {
+    setConfirmState(null);
+    onConfirmChange?.(false);
+  };
+
+  const formatBookingDate = (value) => {
+    if (!value) return 'Дата уточняется';
+    try {
+      return new Date(value).toLocaleString('ru-RU', {
+        dateStyle: 'long',
+        timeStyle: 'short'
+      });
+    } catch (err) {
+      return value;
+    }
+  };
+
+  return (
+    <>
+      <div className={styles.booking}>
+        <motion.div
+          className={styles.ambientGlow}
+          animate={{
+            background: `radial-gradient(circle at 35% 35%, ${CATEGORY_COLORS[glowCategory] || CATEGORY_COLORS.default}, transparent 60%), radial-gradient(circle at 70% 65%, rgba(140, 122, 107, 0.3), transparent 65%), #F7F5F0`
+          }}
+          transition={{ duration: 0.8, ease: 'easeInOut' }}
+        />
+
+        <div className={styles.contentLayer}>
+          <div className={styles.header}>
+            <h1 className={styles.title}>Меню услуг</h1>
+          </div>
+
+          <motion.div
+            className={styles.step}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+          >
+            <p className={styles.sectionTitle}>Услуги</p>
+            <motion.div className={styles.cardStack} ref={listRef}>
+              {isLoading ? (
+                <div className={styles.loader}>Загрузка услуг…</div>
+              ) : error ? (
+                <div className={`${styles.emptyState} glass-panel`}>
+                  <p>Не удалось загрузить услуги. {error}</p>
+                  <button
+                    type="button"
+                    className={styles.inlineBookButton}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      handleRetry();
+                    }}
+                  >
+                    Повторить запрос
+                  </button>
+                </div>
+              ) : !categories.some((category) => category.items.length > 0) ? (
+                <div className={`${styles.emptyState} glass-panel`}>
+                  <p>Каталог услуг обновляется. Менеджер подберёт ритуал вручную после консультации.</p>
+                  <button
+                    type="button"
+                    className={styles.inlineBookButton}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      handleBookingRequest();
+                    }}
+                  >
+                    Записаться у администратора
+                  </button>
+                </div>
+              ) : (
+                categories.map((category) => (
+                  category.items.length > 0 && (
+                    <div key={category.id} className={styles.categoryGroup}>
+                      <h2 className={styles.categoryDivider}>{category.title}</h2>
+                      {category.items.map((service, index) => (
+                        <motion.div
+                          key={service.id}
+                          role="button"
+                          tabIndex={0}
+                          data-viscous
+                          className={`${styles.serviceCard} glass-panel ${activeService?.id === service.id ? `${styles.activeCard} glass-panel-active` : ''}`}
+                          whileTap={{ scale: 0.96 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut', delay: index * 0.04 } }}
+                          onClick={() => handleServiceSelect(service)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              handleServiceSelect(service);
+                            }
+                          }}
+                        >
+                          <div className={styles.cardContent}>
+                            <div>
+                              <p className={styles.serviceTitle}>{service.title}</p>
+                              <p className={styles.serviceDescription}>{service.description || 'Персональный уход, подобранный мастером'}</p>
+                            </div>
+                            <div className={styles.serviceMetadata}>
+                              <span className={styles.serviceDuration}>{service.duration || '60 мин'}</span>
+                              <span className={styles.servicePrice}>{typeof service.price === 'string' ? service.price : `${service.price || service.basePrice || '—'} ₽`}</span>
+                            </div>
+                          </div>
+                          <AnimatePresence>
+                            {activeService?.id === service.id && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                                animate={{ height: 'auto', opacity: 1, marginTop: 16 }}
+                                exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                                style={{ overflow: 'hidden', width: '100%' }}
+                              >
+                                {service.hasModifiers ? (
+                                  <ServiceConstructor
+                                    service={service}
+                                    modifiersData={NAIL_MODIFIERS}
+                                    isSubmitting={isSubmitting}
+                                    onBook={(payload) => {
+                                      triggerHaptic('heavy');
+                                      handleBookingRequest(payload);
+                                    }}
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className={styles.inlineBookButton}
+                                    disabled={isSubmitting}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      triggerHaptic('heavy');
+                                      handleBookingRequest({ service, totalPrice: getNumericPrice(service), url: service?.bookingUrl || '' });
+                                    }}
+                                  >
+                                    {isSubmitting ? 'Отправка...' : 'Записаться онлайн'}
+                                  </button>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )
+                ))
+              )}
+            </motion.div>
+          </motion.div>
+
+        </div>
+      </div>
+
+      {bookingError ? <p className={styles.bookingError}>{bookingError}</p> : null}
+
+      <BookingModal isOpen={isBookingOpen} onClose={handleBookingClose} />
+
+      <AnimatePresence>
+        {confirmState ? (
+          <motion.div
+            className={styles.confirm}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            <ConfirmationParticles />
+            <div className={styles.confirmRing}>
+              <div className={styles.confirmRingTrack} />
+              <div className={styles.confirmRingSpinner} />
+            </div>
+            <h2 className={styles.confirmTitle}>Ритуал забронирован</h2>
+            <div className={styles.confirmDetails}>
+              <p className={styles.confirmService}>{confirmState.service?.title}</p>
+              <div className={styles.confirmMeta}>
+                <span>{formatBookingDate(confirmState.date)}</span>
+                {confirmState.totalPrice ? (
+                  <span>{confirmState.totalPrice.toLocaleString('ru-RU')} ₽</span>
+                ) : null}
+              </div>
+            </div>
+            <div className={styles.confirmActions}>
+              <button type="button" className="btn-ink" onClick={handleConfirmClose}>
+                Готово
+              </button>
+              <button type="button" className={styles.confirmOutline} onClick={handleConfirmClose}>
+                Вернуться к услугам
+              </button>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </>
+  );
+}
+</file>
+
+<file path="src/screens/BookingScreen.module.css">
+.booking {
   position: relative;
   min-height: 100dvh;
-  padding-top: calc(var(--safe-top) + 24px);
-  padding-bottom: calc(var(--safe-bottom) + var(--tabbar-space));
-  overflow-x: hidden;
+  padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + var(--tabbar-space));
+  overflow: hidden;
+  color: var(--ink);
 }
 
 .ambientGlow {
@@ -4402,124 +3136,832 @@ export default function PortfolioScreen() {
   height: 200%;
   top: -50%;
   left: -50%;
-  z-index: 0;
-  pointer-events: none;
   filter: blur(95px);
-}
-
-.bgOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
   pointer-events: none;
-  transition: background 0.5s ease;
+  z-index: 0;
+  background: #F7F5F0;
 }
 
-.inner {
+.contentLayer {
   position: relative;
   z-index: 1;
 }
 
 .header {
-  margin-bottom: 24px;
-  padding: 0 18px;
-}
-
-.kicker {
-  font-size: 10px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--ink-60);
+  position: relative;
+  z-index: 2;
+  margin-bottom: 0;
 }
 
 .title {
-  margin: 4px 0 0;
   font-family: var(--font-display);
-  font-size: 32px;
-  text-transform: lowercase;
+  font-size: 28px;
+  text-transform: none;
+  margin: 0;
+  font-weight: 500;
 }
 
-.lane {
-  margin-bottom: 28px;
+.categoryGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
 }
 
-.laneHeader {
+.categoryDivider {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-style: italic;
+  color: var(--ink);
+  margin: 0 0 8px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding-bottom: 8px;
+}
+
+.step {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.cardStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loader {
+  min-height: 140px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-left: 18px;
-  margin-bottom: 10px;
+  justify-content: center;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  font-size: 11px;
+  color: var(--ink-60);
 }
 
-.laneTitle {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 22px;
+.bookingError {
+  margin: 18px 0 0;
+  text-align: center;
+  color: var(--ink);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.emptyState {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+  color: var(--ink-60);
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-60);
+}
+
+.serviceCard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.28s var(--smooth), background 0.28s var(--smooth), transform 0.22s var(--smooth);
+}
+
+.serviceCard:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 2px;
+}
+
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 10px;
+}
+
+.serviceMetadata {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 9px;
+}
+
+.serviceTitle {
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0;
+}
+
+.activeCard {
+  transform: scale(0.98);
+}
+
+.serviceDuration {
+  font-size: 13px;
+  color: var(--ink-60);
+}
+
+.servicePrice {
+  font-size: 15px;
+  font-weight: 600;
   color: var(--ink);
 }
 
-.laneAccent {
-  height: 2px;
-  flex: 1;
-  border-radius: 2px;
-  transition: background 0.4s ease;
+.inlineBookButton {
+  width: 100%;
+  padding: 14px 0;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--ink);
+  border-radius: 16px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.2), 0 2px 18px rgba(0, 0, 0, 0.4);
 }
 
-.laneScroll {
+.selectedBar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 0.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+}
+
+.selectedTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.selectedPrice {
+  font-size: 12px;
+  color: rgba(28, 28, 30, 0.5);
+}
+
+.dateStrip {
+  display: flex;
+  gap: 12px;
   overflow-x: auto;
+  padding-bottom: 8px;
   scroll-snap-type: x mandatory;
-  gap: 10px;
-  padding: 0 18px 16px;
+}
+
+.dateChip {
+  min-width: 100px;
+  padding: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.65);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.dateActive {
+  background: #FFFFFF;
+  color: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.dateNum {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.dateWeek {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.slot {
+  padding: 18px 0;
+  border-radius: 18px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-weight: 500;
+  transition: transform 0.25s var(--spring), background 0.3s;
+}
+
+.slot:active {
+  transform: scale(0.94);
+}
+
+.slotBusy {
+  opacity: 0.4;
+  text-decoration: line-through;
+  color: var(--ink-60);
+}
+
+.slotActive {
+  background: #FFFFFF;
+  color: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  padding: 60px 30px 40px;
+  background: var(--cream-dark);
+  color: var(--ink);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.confirmLogo {
+  width: 120px;
+  height: auto;
+}
+
+.confirmRing {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.confirmRingTrack,
+.confirmRingSpinner {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.confirmRingSpinner {
+  border-top-color: var(--ink);
+  border-left-color: transparent;
+  animation: spin 8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.confirmTitle {
+  font-family: var(--font-display);
+  font-size: 34px;
+  margin: 0;
+  color: var(--ink);
+}
+
+.confirmDetails {
+  color: var(--ink);
+}
+
+.confirmService {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.confirmMeta {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.confirmActions {
+  margin-top: 32px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirmOutline {
+  border-radius: var(--radius-pill);
+  padding: 14px 28px;
+  border: 1px solid rgba(28, 27, 26, 0.15);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.selectedBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 0.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+}
+</file>
+
+<file path="src/screens/InfoScreen.jsx">
+import styles from './InfoScreen.module.css';
+
+const LINKS = [{ label: 'ВКонтакте', url: 'https://vk.com/natasha_premium_lab' }];
+
+export default function InfoScreen() {
+  const handleOpenExternal = (url) => {
+    if (!url) return;
+    window.open(url, '_blank');
+  };
+
+  return (
+    <div className={styles.info}>
+      <div className={styles.inner}>
+        <h1 className={styles.title}>Studio</h1>
+
+        <div className={styles.card}>
+          <p className={styles.cardLabel}>Контакты</p>
+          <p className={styles.cardValue}>Адрес: (В процессе добавления)</p>
+          <p className={styles.cardValue}>пн–вс · 10:00—20:00</p>
+          <a href="tel:+70000000000" className={styles.cardLink}>+7 (000) 000-00-00</a>
+        </div>
+
+        <div className={styles.card}>
+          <p className={styles.cardLabel}>О мастере</p>
+          <p className={styles.quote}>
+            Информация о мастере обновляется...
+          </p>
+        </div>
+
+        <div className={styles.links}>
+          {LINKS.map((link) => (
+            <button
+              key={link.label}
+              type="button"
+              className={styles.link}
+              onClick={() => handleOpenExternal(link.url)}
+            >
+              <span>{link.label}</span>
+              <svg viewBox="0 0 24 24">
+                <path d="M7 17 17 7M7 7h10v10" />
+              </svg>
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.card}>
+          <p className={styles.cardLabel}>Политика конфиденциальности</p>
+          <p className={styles.cardValue}>
+            Настоящая политика описывает, как Natasha Beauty Lab собирает, использует и защищает персональные данные пользователей приложения.
+          </p>
+          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Какие данные мы собираем</p>
+          <p className={styles.cardValue}>
+            Имя и идентификатор ВКонтакте — для персонализации и истории визитов. Дата и время записи — для управления расписанием. Мы не собираем номера карт, пароли и геолокацию.
+          </p>
+          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Как мы используем данные</p>
+          <p className={styles.cardValue}>
+            Данные используются исключительно для записи к мастеру, отправки напоминаний и ведения истории визитов. Данные не передаются третьим лицам и не используются в рекламных целях.
+          </p>
+          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Хранение данных</p>
+          <p className={styles.cardValue}>
+            Данные хранятся на серверах Yandex Cloud на территории Российской Федерации в соответствии с требованиями ФЗ-152 «О персональных данных».
+          </p>
+          <p className={styles.cardLabel} style={{ marginTop: 12 }}>Ваши права</p>
+          <p className={styles.cardValue}>
+            Вы можете запросить удаление своих данных, написав администратору через ВКонтакте. Данные будут удалены в течение 3 рабочих дней.
+          </p>
+          <p className={styles.cardValue} style={{ marginTop: 12, fontSize: 11, opacity: 0.5 }}>
+            Последнее обновление: апрель 2026 г.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/screens/InfoScreen.module.css">
+.info {
+  min-height: 100dvh;
+  background: var(--cream);
+  color: var(--ink);
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 100dvh;
+  padding: calc(var(--safe-top) + 48px) 24px calc(var(--safe-bottom) + var(--tabbar-space));
+  overflow-y: auto;
   scrollbar-width: none;
 }
 
-.laneScroll::-webkit-scrollbar {
+.inner::-webkit-scrollbar {
   display: none;
 }
 
+.title {
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 400;
+  margin: 40px 0;
+  text-transform: lowercase;
+}
+
 .card {
-  width: 180px;
-  height: 220px;
-  flex-shrink: 0;
-  padding: 18px;
-  scroll-snap-align: start;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
+  padding: 24px 0;
+  border-top: 1px solid var(--ink-10);
   background: transparent;
 }
 
-.cardImage {
-  z-index: 0;
+.cardLabel {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
 }
 
-.cardAura {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(10, 10, 12, 0.95) 0%, rgba(10, 10, 12, 0) 80%);
-  z-index: 1;
-  pointer-events: none;
+.cardValue {
+  margin: 4px 0;
+  color: var(--ink-60);
+  font-family: var(--font-body);
+  line-height: 1.6;
 }
 
-.cardCopy {
+.cardLink {
+  margin-top: 8px;
+  display: inline-block;
+  color: var(--ink-60);
+  font-family: var(--font-body);
+  text-decoration: none;
+}
+
+.cardLink:hover {
+  text-decoration: underline;
+}
+
+.quote {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-style: italic;
+  color: var(--ink);
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--ink-10);
+}
+
+.link {
+  border: none;
+  border-bottom: 1px solid var(--ink-10);
+  padding: 20px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  font-family: var(--font-body);
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  color: var(--ink);
+  text-align: left;
+}
+
+.link svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--ink);
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+</file>
+
+<file path="src/screens/MasterScreen.module.css">
+.master {
   position: relative;
+  min-height: 100dvh;
+  padding-bottom: 80px;
+  overflow-y: auto;
+  color: var(--ink);
+}
+
+.ambientGlow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(90px);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  padding: 24px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  z-index: 2;
 }
 
-.cardCopy p {
+.kicker {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--ink-60);
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
   margin: 0;
-  font-size: 16px;
-  font-family: var(--font-display);
 }
 
-.cardCopy span {
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.tab {
+  padding: 12px;
+  border-radius: 14px;
+  border: none;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink-60);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.tabActive {
+  color: var(--ink);
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.analyticsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.analyticsCard {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+  border-radius: 16px;
+  background: rgba(20, 20, 20, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  gap: 6px;
+}
+
+.statLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-60);
+}
+
+.statNumber {
+  font-family: var(--font-display);
+  font-size: 28px;
+  color: #fff;
+  line-height: 1;
+  margin: 4px 0;
+}
+
+.statText {
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  line-height: 1.2;
+  margin: 4px 0;
+}
+
+.statSub {
   font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.groupLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-60);
+  margin: 8px 0 4px;
+}
+
+.card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardHighlight {
+  border-left: 3px solid rgba(76, 29, 149, 0.8);
+}
+
+.cardMuted {
+  opacity: 0.6;
+}
+
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.cardPrice {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  margin: 0;
+}
+
+.cardSub {
+  font-size: 12px;
+  color: var(--ink-60);
+  margin: 0;
+}
+
+.editRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.editInput {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(28, 27, 26, 0.15);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.btnEdit {
+  font-size: 12px;
+  color: var(--ink-60);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 2px;
+  text-align: left;
+}
+
+.btnSave {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(120deg, var(--chrome-purple), var(--chrome-bronze));
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnCancel {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.empty {
+  text-align: center;
+  color: var(--ink-60);
+  font-size: 14px;
+  padding: 30px 0;
+}
+
+.denied {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--cream);
+}
+
+.actionsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.btnAdd {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px dashed rgba(28,27,26,0.2);
+  background: rgba(255,255,255,0.65);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnDelete {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(220, 38, 38, 0.12);
+  color: rgba(220, 38, 38, 0.85);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnDeleteSoft {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255,255,255,0.65);
+  color: var(--ink-60);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.hiddenBadge {
+  font-size: 10px;
+  background: rgba(28,27,26,0.08);
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
   color: var(--ink-60);
 }
 </file>
@@ -4629,7 +4071,10 @@ export default function ProfileScreen() {
     <div className={styles.profile}>
       <motion.div
         className={styles.ambientGlow}
-        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(76, 29, 149, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(120, 53, 15, 0.4), transparent 65%), #0a0a0c' }}
+        animate={{
+          background:
+            'radial-gradient(circle at 30% 20%, rgba(212, 197, 179, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(240, 235, 225, 0.5), transparent 65%), #F7F5F0'
+        }}
         transition={{ duration: 0.8, ease: 'easeInOut' }}
       />
       <div className={styles.inner}>
@@ -4662,7 +4107,7 @@ export default function ProfileScreen() {
         </section>
 
         <footer className={styles.footer}>
-          <button className="btn-ink glass-panel" onClick={openAdmin}>Написать администратору</button>
+          <button className="btn-ink" onClick={openAdmin}>Написать администратору</button>
         </footer>
       </div>
     </div>
@@ -4804,7 +4249,7 @@ export default function ProfileScreen() {
 .statValue {
   font-size: 20px;
   font-weight: 700;
-  color: var(--ink-100);
+  color: var(--ink);
 }
 
 .statLabel {
@@ -4831,7 +4276,7 @@ export default function ProfileScreen() {
 .upcomingDate {
   font-size: 15px;
   font-weight: 600;
-  color: var(--ink-100);
+  color: var(--ink);
 }
 
 .upcomingService {
@@ -4855,7 +4300,7 @@ export default function ProfileScreen() {
 .historyService {
   font-size: 14px;
   font-weight: 600;
-  color: var(--ink-100);
+  color: var(--ink);
 }
 
 .historyDate {
@@ -4866,7 +4311,7 @@ export default function ProfileScreen() {
 .historyPrice {
   font-size: 14px;
   font-weight: 600;
-  color: var(--ink-100);
+  color: var(--ink);
   white-space: nowrap;
 }
 
@@ -4880,25 +4325,25 @@ export default function ProfileScreen() {
 
 <file path="src/styles/global.css">
 :root {
-  --cream: #0a0a0c;
-  --cream-dark: #131316;
-  --linen: #1a1a1f;
-  --glass-white: rgba(255, 255, 255, 0.08);
-  --glass-border: rgba(255, 255, 255, 0.16);
-  --glass-shine: rgba(255, 255, 255, 0.32);
-  --ink: #ffffff;
-  --ink-60: rgba(255, 255, 255, 0.62);
-  --ink-30: rgba(255, 255, 255, 0.32);
-  --ink-10: rgba(255, 255, 255, 0.12);
-  --chrome-base: #1a1a1f;
-  --chrome-purple: #4c1d95;
-  --chrome-bronze: #78350f;
-  --chrome-overlay: rgba(15, 15, 20, 0.55);
+  --cream: #FDFCFB;
+  --cream-dark: #EAE5DE;
+  --linen: #F0EBE1;
+  --glass-white: rgba(255, 255, 255, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-shine: rgba(255, 255, 255, 0.9);
+  --ink: #141414;
+  --ink-60: rgba(20, 20, 20, 0.6);
+  --ink-30: rgba(20, 20, 20, 0.3);
+  --ink-10: rgba(20, 20, 20, 0.1);
+  --chrome-base: #F7F5F0;
+  --chrome-purple: #8C7A6B;
+  --chrome-bronze: #D4C5B3;
+  --chrome-overlay: rgba(247, 245, 240, 0.55);
   --font-display: 'Playfair Display', serif;
   --font-body: 'Space Grotesk', sans-serif;
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --smooth: cubic-bezier(0.16, 1, 0.3, 1);
-  --radius-card: 22px;
+  --radius-card: 24px;
   --radius-pill: 28px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -4950,6 +4395,7 @@ button {
   overflow: visible;
   background: transparent;
   color: var(--ink);
+  isolation: isolate;
 }
 
 .material {
@@ -4957,31 +4403,29 @@ button {
   inset: 0;
   max-width: 430px;
   margin: 0 auto;
-  background:
-    radial-gradient(circle at 20% 10%, rgba(76, 29, 149, 0.45), transparent 55%),
-    radial-gradient(circle at 80% 80%, rgba(120, 53, 15, 0.4), transparent 45%),
-    var(--chrome-base);
-  z-index: 0;
+  background: radial-gradient(circle at 50% 0%, #FFFFFF 0%, var(--cream) 60%, #EAE5DE 100%);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .material::after {
   content: '';
   position: absolute;
   inset: 0;
-  opacity: 0.06;
+  opacity: 0.03;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 180px;
 }
 
 .glass {
-  background: var(--glass-white);
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55));
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-card);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   box-shadow:
     inset 0 1px 0 var(--glass-shine),
-    0 25px 60px rgba(0, 0, 0, 0.45);
+    0 25px 60px rgba(0, 0, 0, 0.08);
   position: relative;
   overflow: hidden;
 }
@@ -4999,45 +4443,46 @@ button {
 }
 
 .glass-panel {
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%) !important;
-  backdrop-filter: blur(22px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(24px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(150%) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 18px 50px rgba(0, 0, 0, 0.45),
-    0 0 0 0.5px rgba(255, 255, 255, 0.08) !important;
-  border-radius: 24px !important;
-  overflow: visible !important;
+    inset 1px 1px 0 rgba(255, 255, 255, 0.9),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.3),
+    0 12px 32px rgba(28, 27, 26, 0.04) !important;
+  border-radius: var(--radius-card) !important;
   border: none !important;
+  transition: transform 0.25s var(--spring), background 0.25s ease !important;
 }
 
 .glass-panel-active {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 100%) !important;
-  backdrop-filter: blur(28px) saturate(220%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(220%) !important;
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.25),
-    0 25px 55px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.12) !important;
-  border-radius: 24px !important;
-  overflow: visible !important;
+  background: var(--ink) !important;
+  color: #FFFFFF !important;
+  backdrop-filter: blur(24px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(150%) !important;
+  box-shadow: 0 16px 40px rgba(28, 27, 26, 0.15) !important;
+  border-radius: var(--radius-card) !important;
   border: none !important;
+  transform: translateY(-2px);
+}
+
+.glass-panel:active {
+  transform: scale(0.97) !important;
 }
 
 .btn-ink {
-  background: linear-gradient(120deg, var(--chrome-purple), var(--chrome-bronze));
-  color: rgba(255, 255, 255, 0.92);
-  border: none;
-  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #2A2826 0%, #1C1B1A 100%) !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  border-radius: var(--radius-pill) !important;
   padding: 14px 28px;
   font-size: 14px;
   letter-spacing: 0.03em;
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: transform 0.25s var(--spring);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 8px 20px rgba(28, 27, 26, 0.12) !important;
+  transition: transform 0.25s var(--spring), box-shadow 0.25s var(--spring) !important;
 }
 
 .btn-ink::before {
@@ -5052,12 +4497,12 @@ button {
 }
 
 .btn-ink:active {
-  transform: scale(0.94);
+  transform: scale(0.96) !important;
 }
 
 .btn-glass {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: var(--radius-pill);
   padding: 14px 28px;
   font-size: 14px;
@@ -5066,7 +4511,7 @@ button {
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(24px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 10px 30px rgba(0, 0, 0, 0.08);
   transition: transform 0.25s var(--spring);
 }
 
@@ -5098,83 +4543,6 @@ button {
 }
 </file>
 
-<file path="src/utils/assetUrl.js">
-export const asset = (path) => import.meta.env.BASE_URL + path.replace(/^\//, '');
-</file>
-
-<file path="src/utils/config.js">
-export const API_URL = 'https://functions.yandexcloud.net/d4eb8ife6rqecrip6jp3';
-</file>
-
-<file path="src/utils/haptic.js">
-import bridge from '@vkontakte/vk-bridge';
-
-export const haptic = {
-  light: () => bridge.send('VKWebAppTapticImpactOccurred', { style: 'light' }).catch(() => {}),
-  medium: () => bridge.send('VKWebAppTapticImpactOccurred', { style: 'medium' }).catch(() => {}),
-  success: () => bridge.send('VKWebAppTapticNotificationOccurred', { type: 'success' }).catch(() => {}),
-  select: () => bridge.send('VKWebAppTapticSelectionChanged', {}).catch(() => {})
-};
-</file>
-
-<file path="vite.config.js">
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-const enableHttps = process.env.VITE_DEV_HTTPS === 'true';
-
-export default defineConfig({
-  plugins: [react()],
-  base: '/natasha-nails-app/',
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-    https: enableHttps
-  },
-  build: {
-    outDir: 'dist',
-    assetsInlineLimit: 0
-  }
-});
-</file>
-
-<file path="vk-hosting-config.json">
-{
-  "static_path": "dist",
-  "endpoint_main": "index.html",
-  "endpoint_mobile": "index.html",
-  "app_id": 0
-}
-</file>
-
-<file path=".gitignore">
-node_modules
-dist
-.vite
-.DS_Store
-*.log
-repomix-output.xml
-</file>
-
-<file path="README.md">
-# Natasha Nails App — VK Mini App
-
-Приложение для записи к мастеру ногтевого сервиса и солярия.
-
-## Стек
-- React + Vite
-- VK Bridge
-- Framer Motion
-- Yandex Cloud Functions + YDB Serverless
-
-## Локальная разработка
-npm install
-npm run dev
-
-## Деплой
-npm run deploy
-</file>
-
 <file path="src/components/TabBar.jsx">
 import { motion } from 'framer-motion';
 import { haptic } from '../utils/haptic.js';
@@ -5182,19 +4550,17 @@ import useMagnetic from '../hooks/useMagnetic.js';
 import { useVK } from '../contexts/VKContext.jsx';
 import styles from './TabBar.module.css';
 
-const MASTER_IDS = ['80557585', '187729875'];
+const MASTER_IDS = ['80557585', '187729875', '123456789'];
 
 const BASE_TABS = [
-  { id: 'home',      label: 'Дом',     icon: IconHome },
-  { id: 'booking',   label: 'Запись',  icon: IconBooking },
-  { id: 'portfolio', label: 'Работы',  icon: IconPortfolio },
-  { id: 'info',      label: 'О нас',   icon: IconInfo },
-  { id: 'profile',   label: 'Кабинет', icon: IconProfile }
+  { id: 'booking', label: 'Запись', icon: IconBooking },
+  { id: 'profile', label: 'Кабинет', icon: IconProfile },
+  { id: 'info', label: 'О студии', icon: IconInfo }
 ];
 
 const MASTER_TAB = { id: 'master', label: 'Мастер', icon: IconMaster };
 
-export default function TabBar({ active = 'home', onChange, isHidden = false }) {
+export default function TabBar({ active = 'profile', onChange, isHidden = false }) {
   const { user } = useVK();
   const isMaster = MASTER_IDS.includes(String(user?.id));
   const tabs = isMaster ? [...BASE_TABS, MASTER_TAB] : BASE_TABS;
@@ -5235,29 +4601,11 @@ function MagneticTab({ tab, isActive, onChange }) {
   );
 }
 
-function IconHome({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <path d="M4 13.5 16 4l12 9.5V28a1 1 0 0 1-1 1h-6.5a.5.5 0 0 1-.5-.5V21h-8v7.5a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1Z" />
-    </svg>
-  );
-}
-
 function IconBooking({ active }) {
   return (
     <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
       <path d="M8 6h2l.5 2h11L22 6h2a2 2 0 0 1 2 2v18H6V8a2 2 0 0 1 2-2Zm0 7h16" />
       <path d="M11 17h3v7h-3zM18 17h3v7h-3z" />
-    </svg>
-  );
-}
-
-function IconPortfolio({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <path d="M6 10h20v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2Z" />
-      <path d="M12 10V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3" />
-      <path d="M6 15h20" />
     </svg>
   );
 }
@@ -5296,7 +4644,7 @@ import { useVK } from '../contexts/VKContext.jsx';
 import { API_URL } from '../utils/config.js';
 import styles from './MasterScreen.module.css';
 
-const MASTER_IDS = ['80557585', '187729875'];
+const MASTER_IDS = ['80557585', '187729875', '123456789'];
 const CATEGORIES = [
   { id: 'nails', label: 'Маникюр & Педикюр' },
   { id: 'solarium', label: 'Солярий' },
@@ -5536,6 +4884,69 @@ function ServicesTab() {
   );
 }
 
+// ─── АНАЛИТИКА ────────────────────────────────────────────────────────────────
+function AnalyticsTab() {
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_URL}?action=all_appointments`)
+      .then(r => r.json())
+      .then(d => setAppointments(d.appointments || []))
+      .catch(() => setAppointments([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className={styles.empty}>Сбор данных…</p>;
+  if (!appointments.length) return <p className={styles.empty}>Нет данных для аналитики</p>;
+
+  // Calculations
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const thisMonthApps = appointments.filter(a => {
+    // YDB Datetime is in seconds if < 1e10, otherwise ms
+    const date = new Date(a.appointment_date > 1e10 ? a.appointment_date : a.appointment_date * 1000);
+    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+  });
+
+  const monthlyRevenue = thisMonthApps.reduce((sum, a) => sum + (a.total_price || 0), 0);
+  const totalRevenue = appointments.reduce((sum, a) => sum + (a.total_price || 0), 0);
+
+  // Top Service
+  const serviceCounts = {};
+  appointments.forEach(a => {
+    const name = a.title || a.service_id;
+    serviceCounts[name] = (serviceCounts[name] || 0) + 1;
+  });
+  const topService = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1])[0];
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.analyticsGrid}>
+        <div className={`${styles.analyticsCard} glass-panel`}>
+          <span className={styles.statLabel}>Выручка (Октябрь)</span>
+          <span className={styles.statNumber}>{monthlyRevenue.toLocaleString('ru-RU')} ₽</span>
+          <span className={styles.statSub}>Всего визитов: {thisMonthApps.length}</span>
+        </div>
+
+        <div className={`${styles.analyticsCard} glass-panel`}>
+          <span className={styles.statLabel}>Популярная услуга</span>
+          <span className={styles.statText}>{topService ? topService[0] : '—'}</span>
+          <span className={styles.statSub}>Сделано раз: {topService ? topService[1] : 0}</span>
+        </div>
+
+        <div className={`${styles.analyticsCard} glass-panel`} style={{ gridColumn: '1 / -1' }}>
+          <span className={styles.statLabel}>Выручка (За все время)</span>
+          <span className={styles.statNumber}>{totalRevenue.toLocaleString('ru-RU')} ₽</span>
+          <span className={styles.statSub}>Всего записей в базе: {appointments.length}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function MasterScreen() {
   const { user } = useVK();
@@ -5547,9 +4958,11 @@ export default function MasterScreen() {
 
   return (
     <div className={styles.master}>
-      <motion.div className={styles.ambientGlow}
-        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(76,29,149,0.45), transparent 60%), #0a0a0c' }}
-        transition={{ duration: 0.8 }} />
+      <motion.div
+        className={styles.ambientGlow}
+        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(212, 197, 179, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(140, 122, 107, 0.35), transparent 65%), #F7F5F0' }}
+        transition={{ duration: 0.8 }}
+      />
       <div className={styles.inner}>
         <header className={styles.header}>
           <span className={styles.kicker}>МАСТЕР</span>
@@ -5560,9 +4973,12 @@ export default function MasterScreen() {
             onClick={() => setTab('appointments')}>Записи</button>
           <button className={`${styles.tab} ${tab === 'services' ? styles.tabActive : ''} glass-panel`}
             onClick={() => setTab('services')}>Услуги</button>
+          <button className={`${styles.tab} ${tab === 'analytics' ? styles.tabActive : ''} glass-panel`}
+            onClick={() => setTab('analytics')}>Аналитика</button>
         </div>
         {tab === 'appointments' && <AppointmentsTab />}
         {tab === 'services' && <ServicesTab />}
+        {tab === 'analytics' && <AnalyticsTab />}
       </div>
     </div>
   );

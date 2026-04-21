@@ -7,15 +7,14 @@ import styles from './TabBar.module.css';
 const MASTER_IDS = ['80557585', '187729875', '123456789'];
 
 const BASE_TABS = [
-  { id: 'home',    label: 'Дом',     icon: IconHome },
-  { id: 'booking', label: 'Запись',  icon: IconBooking },
-  { id: 'info',    label: 'О нас',   icon: IconInfo },
-  { id: 'profile', label: 'Кабинет', icon: IconProfile }
+  { id: 'booking', label: 'Запись', icon: IconBooking },
+  { id: 'profile', label: 'Кабинет', icon: IconProfile },
+  { id: 'info', label: 'О студии', icon: IconInfo }
 ];
 
 const MASTER_TAB = { id: 'master', label: 'Мастер', icon: IconMaster };
 
-export default function TabBar({ active = 'home', onChange, isHidden = false }) {
+export default function TabBar({ active = 'profile', onChange, isHidden = false }) {
   const { user } = useVK();
   const isMaster = MASTER_IDS.includes(String(user?.id));
   const tabs = isMaster ? [...BASE_TABS, MASTER_TAB] : BASE_TABS;
@@ -53,14 +52,6 @@ function MagneticTab({ tab, isActive, onChange }) {
         <span className={styles.label}>{tab.label}</span>
       </motion.button>
     </div>
-  );
-}
-
-function IconHome({ active }) {
-  return (
-    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
-      <path d="M4 13.5 16 4l12 9.5V28a1 1 0 0 1-1 1h-6.5a.5.5 0 0 1-.5-.5V21h-8v7.5a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1Z" />
-    </svg>
   );
 }
 

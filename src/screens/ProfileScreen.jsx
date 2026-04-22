@@ -248,6 +248,7 @@ export default function ProfileScreen({ onNavigate }) {
             appointmentId={chatAppt.id}
             currentUserId={String(user?.id || '')}
             currentUserName={user?.first_name || 'Клиент'}
+            contactName="Natasha Premium Lab"
             onClose={() => setChatAppt(null)}
           />
         )}

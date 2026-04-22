@@ -2,11 +2,20 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from '../utils/config.js';
 
-export default function ChatDrawer({ appointmentId, currentUserId, currentUserName, onClose }) {
+const EMOJIS = [
+  '😊','❤️','💅','✨','🌸','💕','👍','🙏','🔥','😍',
+  '💖','🥰','😘','💋','🌺','🌷','💐','🎀','👏','🫶',
+  '💯','🙌','😁','🥳','🤩','💎','👑','🌟','⭐','✅',
+  '😂','🫠','🤗','😇','🥹','💃','🎉','🍀','🫐','🦋'
+];
+
+export default function ChatDrawer({ appointmentId, currentUserId, currentUserName, contactName, onClose }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
   const bottomRef = useRef(null);
+  const inputRef = useRef(null);
 
   const load = async () => {
     if (!appointmentId) return;
@@ -15,9 +24,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}`);
       const data = await res.json();
       setMessages(data.messages || []);
-    } catch (e) {
-      // ignore
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -25,11 +32,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'mark_read',
-        appointment_id: appointmentId,
-        viewer_id: currentUserId
-      })
+      body: JSON.stringify({ action: 'mark_read', appointment_id: appointmentId, viewer_id: currentUserId })
     }).catch(() => {});
   }, [appointmentId, currentUserId]);
 
@@ -59,38 +62,41 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
         })
       });
       setText('');
+      setShowEmoji(false);
       await load();
-    } catch (e) {
-      // ignore
-    }
+    } catch {}
     setSending(false);
   };
 
-  const handleKey = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      send();
-    }
+  const handleKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  };
+
+  const insertEmoji = (emoji) => {
+    setText((prev) => prev + emoji);
+    inputRef.current?.focus();
   };
 
   const formatTs = (ts) => {
     if (!ts) return '';
     const ms = ts > 1e10 ? ts : ts * 1000;
-    const date = new Date(ms);
-    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    const d = new Date(ms);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   };
 
   const formatMsgDate = (ts) => {
     if (!ts) return '';
     const ms = ts > 1e10 ? ts : ts * 1000;
-    const date = new Date(ms);
+    const d = new Date(ms);
     const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    if (date.toDateString() === now.toDateString()) return 'Сегодня';
-    if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === now.toDateString()) return 'Сегодня';
+    if (d.toDateString() === yesterday.toDateString()) return 'Вчера';
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
   };
+
+  const displayName = contactName || 'Чат';
+  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   return (
     <AnimatePresence>
@@ -99,165 +105,214 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           position: 'fixed',
           inset: 0,
           zIndex: 200,
-          background: 'rgba(0,0,0,0.4)',
+          background: '#F5F0EB',
           display: 'flex',
-          alignItems: 'flex-end'
+          flexDirection: 'column'
         }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
       >
-        <motion.div
-          style={{
-            width: '100%',
-            maxHeight: '75vh',
-            background: '#FFFFFF',
-            borderRadius: '20px 20px 0 0',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
-          }}
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div
+        {/* ── Header ── */}
+        <div style={{
+          background: '#fff',
+          borderBottom: '1px solid #EDE8E1',
+          padding: '12px 16px',
+          paddingTop: 'max(12px, env(safe-area-inset-top))',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexShrink: 0
+        }}>
+          <button
+            onClick={onClose}
             style={{
-              padding: '16px 20px 12px',
-              borderBottom: '1px solid #f0ebe4',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 26, color: '#B8963E', lineHeight: 1, padding: '0 4px 0 0'
             }}
           >
-            <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>💬 Чат</p>
-            <button
-              onClick={onClose}
-              style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}
-            >
-              ✕
-            </button>
+            ‹
+          </button>
+          <div style={{
+            width: 40, height: 40, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #C9A84C, #8B6914)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 700, fontSize: 17, flexShrink: 0
+          }}>
+            {avatarLetter}
           </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontWeight: 700, margin: 0, fontSize: 16, lineHeight: 1.2 }}>{displayName}</p>
+            <p style={{ color: '#B8963E', margin: 0, fontSize: 12, lineHeight: 1.4 }}>Natasha Premium Lab</p>
+          </div>
+        </div>
 
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '12px 16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8
-            }}
-          >
-            {messages.length === 0 && (
-              <p style={{ textAlign: 'center', color: '#aaa', fontSize: 14, marginTop: 40 }}>
-                Сообщений пока нет — начните диалог!
-              </p>
-            )}
-            {messages.map((m, index) => {
-              const prev = messages[index - 1];
-              const curMs = m.created_at > 1e10 ? m.created_at : m.created_at * 1000;
-              const prevMs = prev?.created_at ? (prev.created_at > 1e10 ? prev.created_at : prev.created_at * 1000) : null;
-              const showDate = !prevMs || new Date(curMs).toDateString() !== new Date(prevMs).toDateString();
-              const isOwn = String(m.sender_id) === String(currentUserId);
-              return (
-                <div key={m.id || `${curMs}-${index}`}>
-                  {showDate && (
-                    <div style={{ textAlign: 'center', margin: '12px 0 8px' }}>
-                      <span style={{ background: '#f0ebe4', borderRadius: 12, padding: '3px 12px', fontSize: 12, color: '#888' }}>
-                        {formatMsgDate(m.created_at)}
-                      </span>
-                    </div>
+        {/* ── Messages ── */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '12px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4
+        }}>
+          {messages.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#bbb', fontSize: 14, marginTop: 60 }}>
+              Начните диалог 💬
+            </p>
+          )}
+          {messages.map((m, index) => {
+            const prev = messages[index - 1];
+            const curMs = m.created_at > 1e10 ? m.created_at : m.created_at * 1000;
+            const prevMs = prev?.created_at ? (prev.created_at > 1e10 ? prev.created_at : prev.created_at * 1000) : null;
+            const showDate = !prevMs || new Date(curMs).toDateString() !== new Date(prevMs).toDateString();
+            const isOwn = String(m.sender_id) === String(currentUserId);
+            return (
+              <div key={m.id || `${curMs}-${index}`}>
+                {showDate && (
+                  <div style={{ textAlign: 'center', margin: '16px 0 10px' }}>
+                    <span style={{
+                      background: 'rgba(0,0,0,0.12)', borderRadius: 12,
+                      padding: '4px 14px', fontSize: 12, color: '#666'
+                    }}>
+                      {formatMsgDate(m.created_at)}
+                    </span>
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: isOwn ? 'flex-end' : 'flex-start',
+                  marginBottom: 2
+                }}>
+                  {!isOwn && (
+                    <span style={{ fontSize: 11, color: '#aaa', marginBottom: 2, marginLeft: 4 }}>
+                      {m.sender_name || 'Собеседник'}
+                    </span>
                   )}
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: isOwn ? 'flex-end' : 'flex-start'
-                    }}
-                  >
-                    {!isOwn && (
-                      <span style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>
-                        {m.sender_name || 'Собеседник'}
+                  <div style={{
+                    maxWidth: '78%',
+                    padding: '9px 13px',
+                    borderRadius: isOwn ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                    background: isOwn ? 'linear-gradient(135deg, #C9A84C, #9A7328)' : '#fff',
+                    color: isOwn ? '#fff' : '#1A1A1A',
+                    fontSize: 15,
+                    lineHeight: 1.45,
+                    wordBreak: 'break-word',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+                  }}>
+                    {m.text}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 3, marginLeft: 4, marginRight: 4 }}>
+                    <span style={{ fontSize: 11, color: '#bbb' }}>{formatTs(m.created_at)}</span>
+                    {isOwn && (
+                      <span style={{ fontSize: 12, color: m.is_read ? '#B8963E' : '#ccc', fontWeight: 600 }}>
+                        {m.is_read ? '✓✓' : '✓'}
                       </span>
                     )}
-                    <div
-                      style={{
-                        maxWidth: '75%',
-                        padding: '8px 12px',
-                        borderRadius: isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                        background: isOwn ? '#B8963E' : '#F5F0EB',
-                        color: isOwn ? '#fff' : '#1A1A1A',
-                        fontSize: 14,
-                        lineHeight: 1.4,
-                        wordBreak: 'break-word'
-                      }}
-                    >
-                      {m.text}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                      <span style={{ fontSize: 10, color: '#bbb' }}>{formatTs(m.created_at)}</span>
-                      {isOwn && (
-                        <span style={{ fontSize: 11, color: m.is_read ? '#B8963E' : '#bbb' }}>
-                          {m.is_read ? '✓✓' : '✓'}
-                        </span>
-                      )}
-                    </div>
                   </div>
                 </div>
-              );
-            })}
-            <div ref={bottomRef} />
-          </div>
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
 
-          <div
+        {/* ── Emoji Picker ── */}
+        <AnimatePresence>
+          {showEmoji && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ background: '#fff', borderTop: '1px solid #EDE8E1', overflow: 'hidden' }}
+            >
+              <div style={{
+                padding: '12px 16px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(10, 1fr)',
+                gap: 4
+              }}>
+                {EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => insertEmoji(emoji)}
+                    style={{
+                      background: 'none', border: 'none', fontSize: 22,
+                      cursor: 'pointer', padding: 4, borderRadius: 8,
+                      lineHeight: 1
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Input Bar ── */}
+        <div style={{
+          background: '#fff',
+          borderTop: '1px solid #EDE8E1',
+          padding: '10px 12px',
+          paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 8,
+          flexShrink: 0
+        }}>
+          <button
+            onClick={() => setShowEmoji((v) => !v)}
             style={{
-              padding: '12px 16px',
-              borderTop: '1px solid #f0ebe4',
-              display: 'flex',
-              gap: 8
+              background: showEmoji ? '#F5F0EB' : 'none',
+              border: 'none', fontSize: 24, cursor: 'pointer',
+              padding: '6px', borderRadius: 10, lineHeight: 1, flexShrink: 0,
+              transition: 'background 0.2s'
             }}
           >
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Написать сообщение..."
-              rows={1}
-              style={{
-                flex: 1,
-                border: '1px solid #e8e0d5',
-                borderRadius: 12,
-                padding: '8px 12px',
-                fontSize: 14,
-                resize: 'none',
-                outline: 'none',
-                fontFamily: 'inherit'
-              }}
-            />
-            <button
-              onClick={send}
-              disabled={sending || !text.trim()}
-              style={{
-                background: '#B8963E',
-                border: 'none',
-                borderRadius: 12,
-                width: 44,
-                height: 44,
-                color: '#fff',
-                fontSize: 18,
-                cursor: 'pointer',
-                opacity: !text.trim() || sending ? 0.5 : 1,
-                flexShrink: 0
-              }}
-            >
-              ↑
-            </button>
-          </div>
-        </motion.div>
+            😊
+          </button>
+          <textarea
+            ref={inputRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Написать сообщение..."
+            rows={1}
+            style={{
+              flex: 1,
+              border: '1.5px solid #EDE8E1',
+              borderRadius: 20,
+              padding: '9px 14px',
+              fontSize: 15,
+              resize: 'none',
+              outline: 'none',
+              fontFamily: 'inherit',
+              maxHeight: 100,
+              lineHeight: 1.4,
+              background: '#FAFAF8'
+            }}
+          />
+          <button
+            onClick={send}
+            disabled={sending || !text.trim()}
+            style={{
+              background: text.trim() ? 'linear-gradient(135deg, #C9A84C, #9A7328)' : '#E8E3DC',
+              border: 'none', borderRadius: '50%',
+              width: 42, height: 42,
+              color: '#fff', fontSize: 18,
+              cursor: text.trim() ? 'pointer' : 'default',
+              flexShrink: 0,
+              transition: 'background 0.25s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >
+            ↑
+          </button>
+        </div>
       </motion.div>
     </AnimatePresence>
   );

@@ -169,6 +169,7 @@ function ChatTab({ appointments, currentUser }) {
             appointmentId={activeChatClient.room_id}
             currentUserId={String(currentUser?.id)}
             currentUserName={currentUser?.first_name || 'Мастер'}
+            contactName={activeChatClient.name}
             onClose={handleChatClose}
           />
         )}
@@ -1665,6 +1666,7 @@ export default function MasterScreen() {
             appointmentId={chatAppointment.id}
             currentUserId={user?.id}
             currentUserName={user?.first_name || 'Мастер'}
+            contactName={chatAppointment.client_name || `ID: ${chatAppointment.client_id}`}
             onClose={() => setChatAppointment(null)}
           />
         )}

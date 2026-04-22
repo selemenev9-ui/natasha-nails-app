@@ -60,6 +60,7 @@ export default function ChatScreen() {
             appointmentId={chatRoomId}
             currentUserId={String(user?.id)}
             currentUserName={user?.first_name || 'Клиент'}
+            contactName="Natasha Premium Lab"
             onClose={() => setChatOpen(false)}
           />
         )}

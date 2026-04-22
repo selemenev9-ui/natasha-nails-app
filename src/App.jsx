@@ -16,6 +16,8 @@ import { useVK } from './contexts/VKContext.jsx';
  * is wired as a dependency and can be swapped in here for hash-based routing
  * when the app is published inside VK.
  */
+const ROUTES = ['booking', 'info', 'profile', 'chat', 'master'];
+
 const pageVariants = {
   initial: { opacity: 0 },
   animate: { opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } },

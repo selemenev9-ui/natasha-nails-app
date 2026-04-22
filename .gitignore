@@ -1,7 +1,10 @@
 node_modules
 dist
 cloud-functions/
+CLAUDE.md
+PROJECT_BRAIN.md
+repomix-output.xml
+.repomixignore
 .vite
 .DS_Store
 *.log
-repomix-output.xml

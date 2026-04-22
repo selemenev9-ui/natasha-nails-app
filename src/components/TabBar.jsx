@@ -9,6 +9,7 @@ const MASTER_IDS = ['80557585', '187729875', '123456789'];
 const BASE_TABS = [
   { id: 'booking', label: 'Запись', icon: IconBooking },
   { id: 'profile', label: 'Кабинет', icon: IconProfile },
+  { id: 'chat', label: 'Чат', icon: IconChat },
   { id: 'info', label: 'О студии', icon: IconInfo }
 ];
 
@@ -78,6 +79,15 @@ function IconProfile({ active }) {
     <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
       <circle cx="16" cy="11" r="4.2" />
       <path d="M7.5 26c0-4.8 3.8-8 8.5-8s8.5 3.2 8.5 8" />
+    </svg>
+  );
+}
+
+function IconChat({ active }) {
+  return (
+    <svg viewBox="0 0 32 32" className={`${styles.icon} ${active ? styles.iconActive : ''}`}>
+      <path d="M7 6h18a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3h-5.6L13 27.5v-5.5H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Z" />
+      <path d="M11 13h10M11 17h6" />
     </svg>
   );
 }

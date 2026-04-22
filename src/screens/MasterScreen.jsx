@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
@@ -12,6 +12,119 @@ const CATEGORIES = [
   { id: 'solarium', label: 'Солярий' },
   { id: 'extra', label: 'Дополнительно' }
 ];
+
+function ChatTab({ appointments, currentUser }) {
+  const [activeChatClient, setActiveChatClient] = useState(null);
+  const [conversations, setConversations] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API_URL}?action=get_conversations`)
+      .then(r => r.json())
+      .then(d => setConversations(d.conversations || []))
+      .catch(() => {});
+  }, []);
+
+  const clients = useMemo(() => {
+    const map = {};
+    appointments.forEach((a) => {
+      if (a.client_id && a.client_id !== 'manual') {
+        const roomId = `direct_${a.client_id}`;
+        map[roomId] = map[roomId] || {
+          room_id: roomId,
+          client_id: a.client_id,
+          name: normalizeName(a.client_name || `ID: ${a.client_id}`),
+          visits: 0
+        };
+        map[roomId].visits += 1;
+      }
+    });
+
+    conversations.forEach((c) => {
+      const roomId = c.room_id;
+      if (!roomId) return;
+      if (!map[roomId]) {
+        map[roomId] = {
+          room_id: roomId,
+          client_id: c.client_id,
+          name: normalizeName(c.sender_name || `ID: ${c.client_id}`),
+          visits: 0
+        };
+      }
+      map[roomId].lastMessage = c.last_message;
+      map[roomId].lastTime = c.last_time;
+    });
+
+    return Object.values(map);
+  }, [appointments, conversations]);
+
+  if (!clients.length) {
+    return <p style={{ textAlign: 'center', color: '#aaa', padding: 40 }}>Клиентов пока нет</p>;
+  }
+
+  return (
+    <div style={{ padding: '8px 0' }}>
+      {clients.map(c => (
+        <div
+          key={c.room_id || c.client_id || c.name}
+          style={{
+            background: '#fff',
+            borderRadius: 16,
+            padding: '14px 16px',
+            marginBottom: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+          }}
+          onClick={() => setActiveChatClient(c)}
+        >
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              background: '#F5F0EB',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 600,
+              fontSize: 16,
+              flexShrink: 0
+            }}
+          >
+            {c.name?.charAt(0)?.toUpperCase() || '?'}
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontWeight: 600, margin: 0, fontSize: 15 }}>{c.name}</p>
+            <p style={{ color: '#aaa', margin: '2px 0 0', fontSize: 12 }}>
+              {c.visits > 0
+                ? `${c.visits} визит${c.visits === 1 ? '' : c.visits < 5 ? 'а' : 'ов'}`
+                : 'Сообщения без записи'}
+            </p>
+            {c.lastMessage && (
+              <p style={{ color: '#bbb', margin: '2px 0 0', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {c.lastMessage}
+              </p>
+            )}
+          </div>
+          <span style={{ fontSize: 18, color: '#ccc' }}>›</span>
+        </div>
+      ))}
+
+      <AnimatePresence>
+        {activeChatClient && (
+          <ChatDrawer
+            appointmentId={activeChatClient.room_id}
+            currentUserId={String(currentUser?.id)}
+            currentUserName={currentUser?.first_name || 'Мастер'}
+            onClose={() => setActiveChatClient(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 const AVATAR_COLORS = ['#FFD6CC', '#D6EAFF', '#D6FFE4', '#FFF3CC', '#EDD6FF', '#FFD6EC'];
 const FALLBACK_AVATAR = { initials: '?', color: '#D9D4CD' };
 
@@ -1298,6 +1411,7 @@ export default function MasterScreen() {
     { id: 'today',     label: 'Сегодня' },
     { id: 'schedule',  label: 'Расписание' },
     { id: 'clients',   label: 'Клиенты' },
+    { id: 'chat',      label: '💬 Чат' },
     { id: 'services',  label: 'Услуги' },
     { id: 'analytics', label: 'Аналитика' },
     { id: 'graph',     label: 'График' }
@@ -1434,6 +1548,12 @@ export default function MasterScreen() {
             )}
             {tab === 'clients'   && <ClientsTab appointments={appointments} onModalOpen={markModalOpen} onModalClose={markModalClosed} />}
             {tab === 'services'  && <ServicesTab />}
+            {tab === 'chat'      && (
+              <ChatTab
+                appointments={appointments}
+                currentUser={user}
+              />
+            )}
             {tab === 'analytics' && <AnalyticsTab appointments={appointments} services={services} />}
             {tab === 'graph'     && <GraphTab />}
             </motion.div>

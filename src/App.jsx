@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import BookingScreen from './screens/BookingScreen.jsx';
 import InfoScreen from './screens/InfoScreen.jsx';
 import ProfileScreen from './screens/ProfileScreen.jsx';
+import ChatScreen from './screens/ChatScreen.jsx';
 import MasterScreen from './screens/MasterScreen.jsx';
 import OnboardingScreen from './screens/OnboardingScreen.jsx';
 import TabBar from './components/TabBar.jsx';
@@ -14,7 +15,7 @@ import { useVK } from './contexts/VKContext.jsx';
  * is wired as a dependency and can be swapped in here for hash-based routing
  * when the app is published inside VK.
  */
-const ROUTES = ['booking', 'info', 'profile', 'master'];
+const ROUTES = ['booking', 'info', 'profile', 'chat', 'master'];
 
 const pageVariants = {
   initial: { opacity: 0 },
@@ -114,6 +115,7 @@ export default function App() {
           )}
           {currentScreen === 'info' && <InfoScreen />}
           {currentScreen === 'profile' && <ProfileScreen onNavigate={navigate} />}
+          {currentScreen === 'chat' && <ChatScreen onNavigate={navigate} />}
           {currentScreen === 'master' && <MasterScreen />}
         </motion.div>
       </AnimatePresence>

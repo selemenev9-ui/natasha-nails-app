@@ -3,11 +3,16 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { API_URL } from '../utils/config.js';
 import styles from './BookingModal.module.css';
 
-const HOURS = Array.from({ length: 20 }, (_, i) => {
-  const h = 10 + Math.floor(i / 2);
-  const m = i % 2 === 0 ? '00' : '30';
-  return `${String(h).padStart(2,'0')}:${m}`;
-});
+function generateSlots(startTime, endTime) {
+  const slots = [];
+  const [startH] = startTime.split(':').map(Number);
+  const [endH] = endTime.split(':').map(Number);
+  for (let h = startH; h < endH; h++) {
+    slots.push(`${String(h).padStart(2,'0')}:00`);
+    slots.push(`${String(h).padStart(2,'0')}:30`);
+  }
+  return slots;
+}
 
 function todayStr() {
   const d = new Date();
@@ -18,14 +23,27 @@ export default function BookingModal({ isOpen, onClose, onConfirm }) {
   const [date, setDate] = useState(todayStr());
   const [time, setTime] = useState('');
   const [busySlots, setBusySlots] = useState([]);
+  const [dayConfig, setDayConfig] = useState({ start_time: '10:00', end_time: '20:00', is_day_off: false });
+  const [loadingConfig, setLoadingConfig] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !date) return;
-    fetch(`${API_URL}?action=busy_slots&date=${date}`)
-      .then((r) => r.json())
-      .then((d) => setBusySlots(d.slots || []))
-      .catch(() => {});
+    setTime('');
+    setLoadingConfig(true);
+
+    Promise.all([
+      fetch(`${API_URL}?action=day_config&date=${date}`).then(r => r.json()),
+      fetch(`${API_URL}?action=busy_slots&date=${date}`).then(r => r.json())
+    ])
+      .then(([configRes, slotsRes]) => {
+        setDayConfig(configRes.config || { start_time: '10:00', end_time: '20:00', is_day_off: false });
+        setBusySlots(slotsRes.slots || []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingConfig(false));
   }, [isOpen, date]);
+
+  const availableSlots = generateSlots(dayConfig.start_time, dayConfig.end_time);
 
   const handleConfirm = () => {
     if (!date || !time) return;
@@ -54,29 +72,37 @@ export default function BookingModal({ isOpen, onClose, onConfirm }) {
                 onChange={e => setDate(e.target.value)} />
             </div>
 
-            <div className={styles.section}>
-              <p className={styles.label}>Время</p>
-              <div className={styles.timeGrid}>
-                {HOURS.map((h) => {
-                  const busy = busySlots.includes(h);
-                  return (
-                    <button
-                      key={h}
-                      disabled={busy}
-                      className={`${styles.timeSlot} ${time === h ? styles.timeSlotActive : ''} ${busy ? styles.timeSlotBusy : ''}`}
-                      onClick={() => !busy && setTime(h)}
-                    >
-                      {h}
-                    </button>
-                  );
-                })}
+            {loadingConfig ? (
+              <p className={styles.loadingText}>Загрузка расписания…</p>
+            ) : dayConfig.is_day_off ? (
+              <div className={styles.dayOffMsg}>
+                😴 Выходной день — запись недоступна
               </div>
-            </div>
+            ) : (
+              <div className={styles.section}>
+                <p className={styles.label}>
+                  Время · {dayConfig.start_time}–{dayConfig.end_time}
+                </p>
+                <div className={styles.timeGrid}>
+                  {availableSlots.map(h => {
+                    const busy = busySlots.includes(h);
+                    return (
+                      <button key={h}
+                        disabled={busy}
+                        className={`${styles.timeSlot} ${time === h ? styles.timeSlotActive : ''} ${busy ? styles.timeSlotBusy : ''}`}
+                        onClick={() => !busy && setTime(h)}>
+                        {h}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <button className={styles.confirmBtn}
-              disabled={!date || !time}
+              disabled={!date || !time || dayConfig.is_day_off}
               onClick={handleConfirm}>
-              Подтвердить запись {time && `в ${time}`}
+              Подтвердить {time && `в ${time}`}
             </button>
 
             <button className={styles.closeButton} onClick={onClose}>Отмена</button>

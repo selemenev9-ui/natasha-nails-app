@@ -10,6 +10,110 @@ const CATEGORIES = [
   { id: 'solarium', label: 'Солярий' },
   { id: 'extra', label: 'Дополнительно' }
 ];
+
+// ─── GRAPH TAB ────────────────────────────────────────────────────────────────
+function GraphTab() {
+  const [selectedDate, setSelectedDate] = useState(todayKey());
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ start_time: '10:00', end_time: '20:00', is_day_off: false });
+
+  const days = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  });
+
+  const loadConfig = useCallback(async (date) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}?action=day_config&date=${date}`);
+      const data = await res.json();
+      const cfg = data.config || { start_time: '10:00', end_time: '20:00', is_day_off: false };
+      setForm({ start_time: cfg.start_time, end_time: cfg.end_time, is_day_off: cfg.is_day_off });
+    } catch(e) {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadConfig(selectedDate); }, [selectedDate, loadConfig]);
+
+  const save = async () => {
+    setSaving(true);
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_availability', date: selectedDate, ...form })
+    });
+    setSaving(false);
+    loadConfig(selectedDate);
+  };
+
+  const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+
+  return (
+    <div className={styles.tabContent}>
+      <p className={styles.groupLabel}>Выберите день</p>
+      <div className={styles.dayPicker}>
+        {days.map(day => {
+          const d = new Date(day + 'T12:00:00Z');
+          return (
+            <button key={day}
+              className={`${styles.dayBtn} ${selectedDate === day ? styles.dayBtnActive : ''} glass-panel`}
+              onClick={() => setSelectedDate(day)}>
+              <span className={styles.dayName}>{d.toLocaleDateString('ru-RU', { weekday: 'short' })}</span>
+              <span className={styles.dayNum}>{d.getUTCDate()}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {loading ? <p className={styles.empty}>Загрузка…</p> : (
+        <div className={`${styles.card} glass-panel`}>
+          <p className={styles.cardTitle}>
+            {new Date(selectedDate + 'T12:00:00Z').toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+
+          <div className={styles.toggleRow}>
+            <span className={styles.cardSub}>Выходной день</span>
+            <button
+              className={`${styles.toggle} ${form.is_day_off ? styles.toggleOn : ''}`}
+              onClick={() => setForm(v => ({ ...v, is_day_off: !v.is_day_off }))}>
+              <span className={styles.toggleKnob} />
+            </button>
+          </div>
+
+          {!form.is_day_off && (
+            <>
+              <div className={styles.timeSelectRow}>
+                <div className={styles.timeSelectBlock}>
+                  <p className={styles.cardSub}>Начало</p>
+                  <select className={styles.editInput} value={form.start_time}
+                    onChange={e => setForm(v => ({ ...v, start_time: e.target.value }))}>
+                    {HOURS.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div className={styles.timeSelectBlock}>
+                  <p className={styles.cardSub}>Конец</p>
+                  <select className={styles.editInput} value={form.end_time}
+                    onChange={e => setForm(v => ({ ...v, end_time: e.target.value }))}>
+                    {HOURS.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              </div>
+              <p className={styles.cardSub}>
+                Рабочих часов: {Number(form.end_time.split(':')[0]) - Number(form.start_time.split(':')[0])}
+              </p>
+            </>
+          )}
+
+          <button className={styles.btnSave} disabled={saving} onClick={save}>
+            {saving ? 'Сохранение…' : '💾 Сохранить'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 const STATUS_LABELS = {
   pending:   { label: 'Ожидает',    color: '#f59e0b' },
   confirmed: { label: 'Подтверждено', color: '#10b981' },
@@ -543,7 +647,8 @@ export default function MasterScreen() {
     { id: 'schedule',  label: 'Расписание' },
     { id: 'clients',   label: 'Клиенты' },
     { id: 'services',  label: 'Услуги' },
-    { id: 'analytics', label: 'Аналитика' }
+    { id: 'analytics', label: 'Аналитика' },
+    { id: 'graph',     label: 'График' }
   ];
 
   return (
@@ -579,6 +684,7 @@ export default function MasterScreen() {
             {tab === 'clients'   && <ClientsTab appointments={appointments} />}
             {tab === 'services'  && <ServicesTab />}
             {tab === 'analytics' && <AnalyticsTab appointments={appointments} />}
+            {tab === 'graph'     && <GraphTab />}
           </>
         )}
       </div>

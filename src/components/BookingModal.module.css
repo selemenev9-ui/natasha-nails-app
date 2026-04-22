@@ -103,3 +103,20 @@
   opacity: 1; transition: opacity 0.2s;
 }
 .confirmBtn:disabled { opacity: 0.4; cursor: default; }
+
+.loadingText {
+  text-align: center;
+  color: var(--ink-60);
+  font-size: 14px;
+  padding: 10px 0;
+}
+
+.dayOffMsg {
+  text-align: center;
+  padding: 20px;
+  border-radius: 14px;
+  background: rgba(239,68,68,0.08);
+  color: #ef4444;
+  font-size: 15px;
+  font-weight: 600;
+}

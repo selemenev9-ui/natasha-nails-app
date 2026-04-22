@@ -40,11 +40,11 @@ function dateKey(ts) {
   if (!ts) return '';
   const ms = ts > 1e10 ? ts : ts * 1000;
   const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 function todayKey() {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
@@ -520,6 +520,11 @@ export default function MasterScreen() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   const handleAction = async (action, id) => {
     await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },

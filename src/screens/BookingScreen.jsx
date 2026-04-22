@@ -312,6 +312,7 @@ export default function BookingScreen({ onConfirmChange }) {
           setBookingError(null);
           setIsSubmitting(true);
           const bookingDate = `${dateTime.date}T${dateTime.time}:00Z`;
+          console.log('USER DATA:', user);
           const body = {
             service_id: payload.service.id,
             client_id: user.id,

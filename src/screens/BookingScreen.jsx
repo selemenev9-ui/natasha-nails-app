@@ -23,7 +23,7 @@ const CATEGORY_TEMPLATE = [
   { id: 'extra', title: 'Дополнительно' }
 ];
 
-export default function BookingScreen({ onConfirmChange }) {
+export default function BookingScreen({ onConfirmChange, preSelectedService, onServiceConsumed }) {
   const listRef = useRef(null);
   const { triggerHaptic, user } = useVK();
   const [categories, setCategories] = useState(() => CATEGORY_TEMPLATE.map((meta) => ({ ...meta, items: [] })));
@@ -97,6 +97,19 @@ export default function BookingScreen({ onConfirmChange }) {
       controller.abort();
     };
   }, [reloadKey]);
+
+  useEffect(() => {
+    if (!preSelectedService || isLoading) return;
+    for (const category of categories) {
+      const found = category.items?.find((service) => service.id === preSelectedService.serviceId);
+      if (found) {
+        setActiveService(found);
+        setIsBookingOpen(true);
+        onServiceConsumed?.();
+        break;
+      }
+    }
+  }, [preSelectedService, isLoading, categories, onServiceConsumed]);
 
   const handleServiceSelect = (service) => {
     triggerHaptic('medium');

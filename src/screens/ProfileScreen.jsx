@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { motion } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
@@ -15,18 +15,31 @@ function formatDate(timestamp) {
   return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function HistorySection({ clientId }) {
+function HistorySection({ clientId, onNavigate }) {
   const [appointments, setAppointments] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!clientId) { setLoading(false); return; }
-    fetch(`${API_URL}?action=history&client_id=${clientId}`)
-      .then((r) => r.json())
-      .then((data) => setAppointments(data.appointments || []))
-      .catch(() => setAppointments([]))
-      .finally(() => setLoading(false));
+  const fetchHistory = useCallback(async () => {
+    if (!clientId) {
+      setAppointments(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}?action=history&client_id=${clientId}`);
+      const data = await response.json();
+      setAppointments(data.appointments || []);
+    } catch (error) {
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   if (loading) return <p className={styles.historyEmpty}>Загрузка истории…</p>;
   if (!clientId) return <p className={styles.historyEmpty}>Войдите через VK чтобы видеть историю</p>;
@@ -36,6 +49,50 @@ function HistorySection({ clientId }) {
   const now = Date.now() / 1000;
   const upcoming = appointments.find((a) => a.appointment_date > now);
   const past = appointments.filter((a) => a.appointment_date <= now);
+  const STATUS_TEXT = {
+    pending: 'Ожидает подтверждения',
+    confirmed: 'Подтверждено',
+    completed: 'Завершено',
+    cancelled: 'Отменено'
+  };
+  const upcomingDateMs = upcoming
+    ? (upcoming.appointment_date > 1e10 ? upcoming.appointment_date : upcoming.appointment_date * 1000)
+    : null;
+  const timeUntilUpcoming = upcomingDateMs ? upcomingDateMs - Date.now() : null;
+  const isCancelableUpcoming = upcoming && upcoming.status !== 'cancelled';
+  const moreThanDay = isCancelableUpcoming && timeUntilUpcoming > 24 * 60 * 60 * 1000;
+
+  const handleReschedule = async () => {
+    if (!upcoming || upcoming.status === 'cancelled') return;
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm('Перенести запись? Текущая будет отменена, вы выберете новое время.');
+      if (!ok) return;
+    }
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel_appointment', id: upcoming.id })
+    }).catch(() => {});
+    await fetchHistory();
+    onNavigate?.('booking', {
+      serviceId: upcoming.service_id,
+      serviceTitle: upcoming.title || upcoming.service_id
+    });
+  };
+
+  const handleCancel = async () => {
+    if (!upcoming) return;
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm(`Отменить запись на ${formatDate(upcoming.appointment_date)}?`);
+      if (!ok) return;
+    }
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel_appointment', id: upcoming.id })
+    }).catch(() => {});
+    await fetchHistory();
+  };
 
   return (
     <div className={styles.historySection}>
@@ -56,7 +113,27 @@ function HistorySection({ clientId }) {
         <div className={`${styles.upcomingCard} glass-panel`}>
           <p className={styles.upcomingLabel}>⏰ Следующий визит</p>
           <p className={styles.upcomingDate}>{formatDate(upcoming.appointment_date)}</p>
-          <p className={styles.upcomingService}>{upcoming.service_id}</p>
+          <p className={styles.upcomingService}>{upcoming.title || upcoming.service_id}</p>
+          <p className={styles.upcomingStatus}>{STATUS_TEXT[upcoming.status] || upcoming.status}</p>
+          {isCancelableUpcoming && (
+            moreThanDay ? (
+              <div className={styles.upcomingActions}>
+                <button type="button" className={styles.rescheduleBtn} onClick={handleReschedule}>
+                  ↺ Перенести
+                </button>
+                <button type="button" className={styles.cancelBtn} onClick={handleCancel}>
+                  Отменить
+                </button>
+              </div>
+            ) : (
+              <p className={styles.soonNote}>
+                Менее 24 ч до записи —{' '}
+                <a href="https://vk.me/natasha_premium_lab" target="_blank" rel="noreferrer">
+                  напишите нам
+                </a>
+              </p>
+            )
+          )}
         </div>
       )}
 
@@ -66,13 +143,25 @@ function HistorySection({ clientId }) {
           <p className={styles.sectionLabel}>История визитов</p>
           {past.map((a) => (
             <div key={a.id} className={`${styles.historyCard} glass-panel`}>
-              <div className={styles.historyCardLeft}>
-                <p className={styles.historyService}>{a.title || a.service_id}</p>
-                <p className={styles.historyDate}>{formatDate(a.appointment_date)}</p>
+              <div className={styles.historyRow}>
+                <div className={styles.historyCardLeft}>
+                  <p className={styles.historyService}>{a.title || a.service_id}</p>
+                  <p className={styles.historyDate}>{formatDate(a.appointment_date)}</p>
+                </div>
+                {a.total_price > 0 && (
+                  <p className={styles.historyPrice}>{a.total_price.toLocaleString('ru-RU')} ₽</p>
+                )}
               </div>
-              {a.total_price > 0 && (
-                <p className={styles.historyPrice}>{a.total_price.toLocaleString('ru-RU')} ₽</p>
-              )}
+              <button
+                className={styles.rebookBtn}
+                type="button"
+                onClick={() => onNavigate?.('booking', {
+                  serviceId: a.service_id,
+                  serviceTitle: a.title || a.service_id
+                })}
+              >
+                ↺ Повторить
+              </button>
             </div>
           ))}
         </div>
@@ -81,7 +170,7 @@ function HistorySection({ clientId }) {
   );
 }
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ onNavigate }) {
   const { user, cardTheme, toggleTheme, seenTips, isBridgeLoading, isVKEnv } = useVK();
   const firstName = user?.first_name || 'гость';
   const avatar = user?.photo_200 || '';
@@ -119,7 +208,7 @@ export default function ProfileScreen() {
         {/* История визитов */}
         <section className={styles.beautyIdSection}>
           <p className={styles.sectionLabel}>Мои визиты</p>
-          <HistorySection clientId={user?.id ? String(user.id) : null} />
+          <HistorySection clientId={user?.id ? String(user.id) : null} onNavigate={onNavigate} />
         </section>
 
         {/* Beauty ID */}

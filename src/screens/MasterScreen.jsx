@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import bridge from '@vkontakte/vk-bridge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import { API_URL } from '../utils/config.js';
@@ -10,6 +11,33 @@ const CATEGORIES = [
   { id: 'solarium', label: 'Солярий' },
   { id: 'extra', label: 'Дополнительно' }
 ];
+const AVATAR_COLORS = ['#FFD6CC', '#D6EAFF', '#D6FFE4', '#FFF3CC', '#EDD6FF', '#FFD6EC'];
+const FALLBACK_AVATAR = { initials: '?', color: '#D9D4CD' };
+
+function normalizeName(rawName) {
+  if (!rawName) return 'Клиент';
+  const cleaned = rawName.trim();
+  if (!cleaned || /^vk[:\s]/i.test(cleaned) || /^id[:\s]/i.test(cleaned)) return 'Клиент';
+  return cleaned;
+}
+
+function getAvatarMeta(rawName) {
+  const normalized = normalizeName(rawName);
+  if (normalized === 'Клиент') return FALLBACK_AVATAR;
+  const parts = normalized.split(/\s+/);
+  const initials = ((parts[0]?.[0] || '').toUpperCase() + (parts[1]?.[0] || '').toUpperCase()) || normalized[0].toUpperCase();
+  const hash = Array.from(normalized).reduce((acc, char, idx) => acc + char.charCodeAt(0) * (idx + 1), 0);
+  return { initials, color: AVATAR_COLORS[hash % AVATAR_COLORS.length] };
+}
+
+function renderEmptyState(icon, text) {
+  return (
+    <div className={styles.emptyState}>
+      <div className={styles.emptyIcon}>{icon}</div>
+      <p>{text}</p>
+    </div>
+  );
+}
 
 // ─── GRAPH TAB ────────────────────────────────────────────────────────────────
 function GraphTab() {
@@ -115,7 +143,7 @@ function GraphTab() {
   );
 }
 const STATUS_LABELS = {
-  pending:   { label: 'Ожидает',    color: '#f59e0b' },
+  pending:   { label: 'Ожидает',    color: '#B8963E' },
   confirmed: { label: 'Подтверждено', color: '#10b981' },
   completed: { label: 'Выполнено',  color: '#6366f1' },
   cancelled: { label: 'Отменено',   color: '#ef4444' }
@@ -152,7 +180,7 @@ function todayKey() {
 }
 
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
-function TodayTab({ appointments, services, onAction, onAddManual }) {
+function TodayTab({ appointments, services, onAction, onAddManual, onReschedule }) {
   const today = todayKey();
   const todayAppts = appointments
     .filter(a => dateKey(a.appointment_date) === today)
@@ -167,12 +195,44 @@ function TodayTab({ appointments, services, onAction, onAddManual }) {
   });
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 12 ? 'Доброе утро' : greetingHour < 17 ? 'Добрый день' : 'Добрый вечер';
+  const [nextCountdown, setNextCountdown] = useState('');
+  const [nextDiffMs, setNextDiffMs] = useState(null);
+
+  useEffect(() => {
+    if (!nextAppt) {
+      setNextCountdown('');
+      setNextDiffMs(null);
+      return;
+    }
+    const updateCountdown = () => {
+      const ms = (nextAppt.appointment_date > 1e10 ? nextAppt.appointment_date : nextAppt.appointment_date * 1000) - Date.now();
+      setNextDiffMs(ms);
+      if (ms <= 0) {
+        setNextCountdown('СЕЙЧАС ⚡');
+        return;
+      }
+      const totalMinutes = Math.max(1, Math.round(ms / 60000));
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      let label = 'через ';
+      if (hours > 0) {
+        label += `${hours} ч`;
+        if (minutes) label += ` ${minutes} мин`;
+      } else {
+        label += `${minutes} мин`;
+      }
+      if (totalMinutes <= 5) label += ' 🔥';
+      setNextCountdown(label);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 30000);
+    return () => clearInterval(interval);
+  }, [nextAppt]);
 
   return (
     <div className={styles.tabContent}>
       {/* Виджет дня */}
-      <div className={`${styles.card} glass-panel`}
-        style={{ background: 'linear-gradient(135deg, rgba(76,29,149,0.3), rgba(120,53,15,0.2))', borderLeft: '3px solid rgba(76,29,149,0.8)' }}>
+      <div className={`${styles.card} ${styles.greetingCard} glass-panel`}>
         <p className={styles.cardTitle}>{greeting}, Наташа! ✨</p>
         {activeToday.length === 0 ? (
           <p className={styles.cardSub}>Сегодня записей нет — можно отдохнуть 💅</p>
@@ -190,12 +250,32 @@ function TodayTab({ appointments, services, onAction, onAddManual }) {
         )}
       </div>
 
+      {nextAppt && (
+        <div className={`${styles.card} ${styles.nextCard} glass-panel ${nextDiffMs !== null && nextDiffMs <= 15 * 60 * 1000 ? styles.nextHot : ''}`}>
+          <p className={styles.cardSub}>Следующий клиент</p>
+          <div className={styles.cardRow}>
+            <div className={styles.cardMain}>
+              {(() => {
+                const label = normalizeName(nextAppt.client_name || `VK: ${nextAppt.client_id}`);
+                const avatar = getAvatarMeta(label);
+                return <div className={styles.avatar} style={{ background: avatar.color }}>{avatar.initials}</div>;
+              })()}
+              <div>
+                <p className={styles.cardTitle}>{normalizeName(nextAppt.client_name || `VK: ${nextAppt.client_id}`)}</p>
+                <p className={styles.cardSub}>{nextAppt.title || nextAppt.service_id} · {tsToTime(nextAppt.appointment_date)}</p>
+              </div>
+            </div>
+            <div className={styles.nextCountdown}>{nextCountdown}</div>
+          </div>
+        </div>
+      )}
+
       {/* Новые заявки */}
       {pending.length > 0 && (
         <div className={styles.pendingBlock}>
           <p className={styles.groupLabel}>🔔 Новые заявки — {pending.length}</p>
           {pending.map(a => (
-            <AppCard key={a.id} a={a} onAction={onAction} showActions />
+            <AppCard key={a.id} a={a} onAction={onAction} onReschedule={onReschedule} showActions />
           ))}
         </div>
       )}
@@ -235,24 +315,93 @@ function TodayTab({ appointments, services, onAction, onAddManual }) {
 }
 
 // ─── APP CARD ─────────────────────────────────────────────────────────────────
-function AppCard({ a, onAction, showActions }) {
+function AppCard({ a, onAction, showActions, onReschedule }) {
   const st = STATUS_LABELS[a.status] || STATUS_LABELS.pending;
   const [expanded, setExpanded] = useState(false);
+  const clientLabel = normalizeName(a.client_name || `VK: ${a.client_id}`);
+  const avatar = getAvatarMeta(clientLabel);
+  const [touchOffset, setTouchOffset] = useState(0);
+  const startXRef = useRef(null);
+  const supportsTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator?.maxTouchPoints > 0);
+  const threshold = 60;
+
+  const resetSwipe = () => {
+    setTouchOffset(0);
+    startXRef.current = null;
+  };
+
+  const triggerSwipeAction = (direction) => {
+    if (direction === 'right' && a.status === 'pending') {
+      onAction('confirm_appointment', a.id);
+      return true;
+    }
+    if (direction === 'left' && (a.status === 'pending' || a.status === 'confirmed')) {
+      onAction('cancel_appointment', a.id);
+      return true;
+    }
+    return false;
+  };
+
+  const handleTouchStart = (event) => {
+    if (!supportsTouch || event.touches.length === 0) return;
+    startXRef.current = event.touches[0].clientX;
+  };
+
+  const handleTouchMove = (event) => {
+    if (startXRef.current === null) return;
+    const delta = event.touches[0].clientX - startXRef.current;
+    setTouchOffset(delta);
+  };
+
+  const handleTouchEnd = () => {
+    if (startXRef.current === null) return;
+    const delta = touchOffset;
+    const direction = delta > threshold ? 'right' : delta < -threshold ? 'left' : null;
+    if (direction && triggerSwipeAction(direction)) {
+      resetSwipe();
+      return;
+    }
+    resetSwipe();
+  };
+
+  const touchHandlers = supportsTouch ? {
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+    onTouchCancel: resetSwipe
+  } : {};
+
+  const hintOpacity = Math.min(1, Math.abs(touchOffset) / threshold);
+  const swipeStyle = supportsTouch ? {
+    transform: `translateX(${touchOffset}px)`,
+    background: touchOffset > 5 ? '#E8F5E9' : touchOffset < -5 ? '#FFEBEE' : undefined
+  } : undefined;
 
   return (
     <div className={`${styles.card} glass-panel`}
-      style={{ borderLeft: `3px solid ${st.color}` }}>
+      style={{ borderLeft: `3px solid ${st.color}`, ...swipeStyle }}
+      {...touchHandlers}>
       <div className={styles.cardRow} onClick={() => setExpanded(v => !v)}>
-        <div>
-          <p className={styles.cardTitle}>{a.client_name || `VK: ${a.client_id}`}</p>
-          <p className={styles.cardSub}>{a.title || a.service_id} · {tsToTime(a.appointment_date)}</p>
-          <p className={styles.cardSub}>{formatDate(a.appointment_date)}</p>
+        <div className={styles.cardMain}>
+          <div className={styles.avatar} style={{ background: avatar.color }}>{avatar.initials}</div>
+          <div>
+            <p className={styles.cardTitle}>{clientLabel}</p>
+            <p className={styles.cardSub}>{a.title || a.service_id} · {tsToTime(a.appointment_date)}</p>
+            <p className={styles.cardSub}>{formatDate(a.appointment_date)}</p>
+          </div>
         </div>
         <div className={styles.cardRight}>
           {a.total_price > 0 && <p className={styles.cardPrice}>{a.total_price.toLocaleString('ru-RU')} ₽</p>}
-          <span className={styles.statusBadge} style={{ background: st.color + '33', color: st.color }}>
+          <motion.span
+            key={a.status}
+            className={styles.statusBadge}
+            style={{ background: st.color + '33', color: st.color }}
+            initial={{ scale: 1 }}
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 0.3 }}
+          >
             {st.label}
-          </span>
+          </motion.span>
         </div>
       </div>
 
@@ -270,6 +419,11 @@ function AppCard({ a, onAction, showActions }) {
                 <button className={styles.btnCancelAppt} onClick={() => onAction('cancel_appointment', a.id)}>
                   ✕ Отклонить
                 </button>
+                {onReschedule && (
+                  <button className={styles.btnEdit} onClick={() => onReschedule(a)}>
+                    ↺ Перенести
+                  </button>
+                )}
               </div>
             )}
             {a.status === 'confirmed' && (
@@ -280,17 +434,28 @@ function AppCard({ a, onAction, showActions }) {
                 <button className={styles.btnCancelAppt} onClick={() => onAction('cancel_appointment', a.id)}>
                   Отменить
                 </button>
+                {onReschedule && (
+                  <button className={styles.btnEdit} onClick={() => onReschedule(a)}>
+                    ↺ Перенести
+                  </button>
+                )}
               </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
+      {supportsTouch && (
+        <div className={styles.swipeHints} style={{ opacity: hintOpacity }}>
+          <span className={styles.swipeHint}>✕</span>
+          <span className={styles.swipeHint}>✓</span>
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── SCHEDULE TAB ─────────────────────────────────────────────────────────────
-function ScheduleTab({ appointments, onAction, onAddManual }) {
+function ScheduleTab({ appointments, onAction, onAddManual, onReschedule }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -326,7 +491,7 @@ function ScheduleTab({ appointments, onAction, onAddManual }) {
 
       {dayAppts.length === 0
         ? <p className={styles.empty}>Записей нет</p>
-        : dayAppts.map(a => <AppCard key={a.id} a={a} onAction={onAction} showActions />)
+        : dayAppts.map(a => <AppCard key={a.id} a={a} onAction={onAction} onReschedule={onReschedule} showActions />)
       }
 
       <button className={styles.btnAdd} onClick={onAddManual}>+ Добавить запись</button>
@@ -423,11 +588,17 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
             <div key={c.id} className={`${styles.card} glass-panel`}
               style={{ borderLeft: '3px solid #f59e0b' }}>
               <div className={styles.cardRow}>
-                <div>
-                  <p className={styles.cardTitle}>{c.name}</p>
-                  <p className={styles.cardSub}>
-                    Последний визит: {formatDate(c.lastVisit)} · {Math.round((Date.now()/1000 - c.lastVisit)/86400)} дн. назад
-                  </p>
+                <div className={styles.cardMain}>
+                  {(() => {
+                    const avatar = getAvatarMeta(c.name);
+                    return <div className={styles.avatar} style={{ background: avatar.color }}>{avatar.initials}</div>;
+                  })()}
+                  <div>
+                    <p className={styles.cardTitle}>{c.name}</p>
+                    <p className={styles.cardSub}>
+                      Последний визит: {formatDate(c.lastVisit)} · {Math.round((Date.now()/1000 - c.lastVisit)/86400)} дн. назад
+                    </p>
+                  </div>
                 </div>
                 <a href={`https://vk.com/im?sel=${c.id}`} target="_blank" rel="noreferrer"
                   className={styles.btnSave} style={{ textDecoration: 'none', fontSize: 12 }}>
@@ -441,15 +612,21 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
 
       <p className={styles.groupLabel}>Все клиенты — {clients.length}</p>
 
-      {clients.map(c => (
+      {clients.length === 0 ? renderEmptyState('👤', 'Клиенты появятся после первых записей') : clients.map(c => (
         <div key={c.id} className={`${styles.card} glass-panel`}
           style={{ cursor: 'pointer' }}
           onClick={() => openClient(c)}>
           <div className={styles.cardRow}>
-            <div>
-              <p className={styles.cardTitle}>{c.name}</p>
-              {c.phone && <p className={styles.cardSub}>📞 {c.phone}</p>}
-              <p className={styles.cardSub}>Последний визит: {formatDate(c.lastVisit)}</p>
+            <div className={styles.cardMain}>
+              {(() => {
+                const avatar = getAvatarMeta(c.name);
+                return <div className={styles.avatar} style={{ background: avatar.color }}>{avatar.initials}</div>;
+              })()}
+              <div>
+                <p className={styles.cardTitle}>{c.name}</p>
+                {c.phone && <p className={styles.cardSub}>📞 {c.phone}</p>}
+                <p className={styles.cardSub}>Последний визит: {formatDate(c.lastVisit)}</p>
+              </div>
             </div>
             <div className={styles.cardRight}>
               <p className={styles.cardPrice}>{c.spent.toLocaleString('ru-RU')} ₽</p>
@@ -521,7 +698,7 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
 
 // ─── ANALYTICS TAB ────────────────────────────────────────────────────────────
 function AnalyticsTab({ appointments, services }) {
-  if (!appointments.length) return <p className={styles.empty}>Нет данных</p>;
+  if (!appointments.length) return renderEmptyState('📊', 'Данные появятся после первых визитов');
 
   const now = new Date();
   const thisMonth = appointments.filter(a => {
@@ -587,6 +764,40 @@ function AnalyticsTab({ appointments, services }) {
           <span className={styles.statNumber}>{uniqueClients}</span>
           <span className={styles.statSub}>{repeatClients} постоянных</span>
         </div>
+      </div>
+
+      {/* Выручка за 7 дней */}
+      <p className={styles.groupLabel}>📊 Выручка за 7 дней</p>
+      <div className={styles.barChart}>
+        {(() => {
+          const series = Array.from({ length: 7 }).map((_, idx) => {
+            const date = new Date();
+            date.setDate(date.getDate() - (6 - idx));
+            const key = dateKey(date.getTime());
+            const revenue = appointments
+              .filter(a => dateKey(a.appointment_date) === key)
+              .reduce((sum, appt) => sum + (appt.total_price || 0), 0);
+            return { key, revenue, label: date.toLocaleDateString('ru-RU', { weekday: 'short' }).replace('.', '') };
+          });
+          const max = Math.max(...series.map(item => item.revenue), 1);
+          const today = todayKey();
+          return series.map(({ key, revenue, label }) => {
+            const height = Math.round((revenue / max) * 100);
+            const isToday = key === today;
+            return (
+              <div key={key} className={styles.barColumn}>
+                <div className={styles.barWrapper}>
+                  <div
+                    className={`${styles.bar} ${isToday ? styles.barToday : ''}`}
+                    style={{ height: `${height}%`, background: revenue ? '#B8963E' : '#E0D7C3' }}
+                  />
+                </div>
+                <span className={styles.barLabel}>{label}</span>
+                {revenue > 0 && <span className={styles.barValue}>{revenue.toLocaleString('ru-RU')} ₽</span>}
+              </div>
+            );
+          });
+        })()}
       </div>
 
       {/* Рейтинг услуг по выручке в час */}
@@ -799,6 +1010,128 @@ function ManualBookingModal({ services, onClose, onSave, onModalOpen, onModalClo
   );
 }
 
+function ActionCommentModal({ action, appointment, onConfirm, onCancel }) {
+  const [comment, setComment] = useState('');
+
+  const titles = {
+    confirm_appointment: '✓ Подтвердить запись',
+    cancel_appointment: '✕ Отменить запись',
+    complete_appointment: '✓ Отметить выполненной'
+  };
+  const placeholders = {
+    confirm_appointment: 'Например: жду вас, вход со двора...',
+    cancel_appointment: 'Например: заболела, перезвоню завтра...',
+    complete_appointment: 'Например: всё прошло отлично!'
+  };
+
+  return (
+    <motion.div
+      className={styles.modalOverlay}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onCancel}
+    >
+      <motion.div
+        className={`${styles.modal} glass-panel`}
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className={styles.cardTitle}>{titles[action]}</p>
+        <p className={styles.cardSub}>
+          {(appointment?.client_name && normalizeName(appointment.client_name)) || 'Клиент'} · {appointment?.title}
+        </p>
+
+        <textarea
+          className={styles.editInput}
+          rows={3}
+          placeholder={placeholders[action]}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          style={{ resize: 'none', marginTop: 12 }}
+          autoFocus
+        />
+        <p className={styles.cardSub} style={{ fontSize: 11, marginTop: 4 }}>
+          Комментарий отправится клиенту в VK
+        </p>
+
+        <div className={styles.actionsRow} style={{ marginTop: 12 }}>
+          <button className={styles.btnConfirm} onClick={() => onConfirm(comment)}>
+            Подтвердить
+          </button>
+          <button className={styles.btnCancel} onClick={onCancel}>
+            Назад
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function RescheduleModal({ appointment, onConfirm, onCancel }) {
+  const [date, setDate] = useState(todayKey());
+  const [time, setTime] = useState('10:00');
+  const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+
+  return (
+    <motion.div
+      className={styles.modalOverlay}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onCancel}
+    >
+      <motion.div
+        className={`${styles.modal} glass-panel`}
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className={styles.cardTitle}>↺ Предложить перенос</p>
+        <p className={styles.cardSub}>
+          {(appointment?.client_name && normalizeName(appointment.client_name)) || 'Клиент'} · {appointment?.title}
+        </p>
+
+        <p className={styles.cardSub} style={{ marginTop: 12 }}>Новая дата:</p>
+        <input
+          className={styles.editInput}
+          type="date"
+          value={date}
+          min={todayKey()}
+          onChange={(e) => setDate(e.target.value)}
+        />
+
+        <p className={styles.cardSub}>Новое время:</p>
+        <select
+          className={styles.editInput}
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+        >
+          {HOURS.map((h) => (
+            <option key={h} value={h}>{h}</option>
+          ))}
+        </select>
+
+        <p className={styles.cardSub} style={{ fontSize: 11, marginTop: 8 }}>
+          Клиенту придёт предложение в VK, старая запись будет отменена
+        </p>
+
+        <div className={styles.actionsRow} style={{ marginTop: 12 }}>
+          <button className={styles.btnConfirm} onClick={() => onConfirm(date, time)}>
+            Отправить предложение
+          </button>
+          <button className={styles.btnCancel} onClick={onCancel}>
+            Назад
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function MasterScreen() {
   const { user } = useVK();
@@ -807,15 +1140,25 @@ export default function MasterScreen() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
+  const [notifyEnabled, setNotifyEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(localStorage.getItem('master_notify_allowed'));
+  });
   const modalOpenRef = useRef(false);
+  const hasLoadedOnce = useRef(false);
+  const pullStart = useRef(null);
+  const [pullOffset, setPullOffset] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
 
   useEffect(() => {
     modalOpenRef.current = isAnyModalOpen;
   }, [isAnyModalOpen]);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     try {
       const [apptRes, svcRes] = await Promise.all([
         fetch(`${API_URL}?action=all_appointments`).then(r => r.json()),
@@ -823,6 +1166,7 @@ export default function MasterScreen() {
       ]);
       setAppointments(apptRes.appointments || []);
       setServices(svcRes.services || []);
+      hasLoadedOnce.current = true;
     } catch(e) {}
     setLoading(false);
   }, []);
@@ -844,10 +1188,76 @@ export default function MasterScreen() {
   const openManualModal = () => setShowModal(true);
   const closeManualModal = () => setShowModal(false);
 
-  const handleAction = async (action, id) => {
-    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, id }) });
-    loadData();
+  const enableMasterNotifications = useCallback(async () => {
+    if (notifyEnabled) return;
+    try {
+      const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
+        group_id: 237746914,
+        key: 'master_notify'
+      });
+      if (result?.result) {
+        localStorage.setItem('master_notify_allowed', '1');
+        setNotifyEnabled(true);
+      }
+    } catch (e) {
+      // пользователь отказал — ничего не делаем
+    }
+  }, [notifyEnabled]);
+
+  const sendHaptic = (type) => {
+    try {
+      bridge.send('VKWebAppTapticNotificationOccurred', { type });
+    } catch (e) {}
+  };
+
+  const handleAction = (action, id) => {
+    const appointment = appointments.find((a) => a.id === id);
+    if (!appointment) return;
+    setPendingAction({ action, appointment });
+  };
+
+  const executeAction = async (comment) => {
+    if (!pendingAction) return;
+    const { action, appointment } = pendingAction;
+    setPendingAction(null);
+    if (action === 'confirm_appointment' || action === 'complete_appointment') {
+      sendHaptic('success');
+    } else if (action === 'cancel_appointment') {
+      sendHaptic('warning');
+    }
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, id: appointment.id, comment: comment || '' })
+      });
+    } catch (e) {
+      // ignore
+    } finally {
+      loadData();
+    }
+  };
+
+  const handleReschedule = async (date, time) => {
+    if (!rescheduleTarget) return;
+    const appointment = rescheduleTarget;
+    setRescheduleTarget(null);
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reschedule_appointment',
+          id: appointment.id,
+          new_date: date,
+          new_time: time
+        })
+      });
+    } catch (e) {
+      // ignore
+    } finally {
+      loadData();
+    }
   };
 
   if (!isMaster(user?.id)) {
@@ -865,28 +1275,89 @@ export default function MasterScreen() {
     { id: 'graph',     label: 'График' }
   ];
 
+  const handlePullStart = (e) => {
+    if (window.scrollY > 0) return;
+    pullStart.current = e.touches[0].clientY;
+  };
+
+  const handlePullMove = (e) => {
+    if (pullStart.current === null) return;
+    const delta = e.touches[0].clientY - pullStart.current;
+    if (delta > 0) {
+      setIsPulling(true);
+      setPullOffset(Math.min(delta, 120));
+    }
+  };
+
+  const handlePullEnd = () => {
+    if (!isPulling) return;
+    const shouldRefresh = pullOffset > 80;
+    setPullOffset(0);
+    setIsPulling(false);
+    pullStart.current = null;
+    if (shouldRefresh) {
+      sendHaptic('success');
+      loadData();
+    }
+  };
+
   return (
-    <div className={styles.master}>
-      <motion.div className={styles.ambientGlow}
-        animate={{ background: 'radial-gradient(circle at 30% 20%, rgba(76,29,149,0.45), transparent 60%), #0a0a0c' }}
-        transition={{ duration: 0.8 }} />
+    <div className={styles.master}
+      onTouchStart={handlePullStart}
+      onTouchMove={handlePullMove}
+      onTouchEnd={handlePullEnd}
+      onTouchCancel={handlePullEnd}>
+      <div className={styles.pullIndicator} style={{ height: pullOffset }}>
+        {pullOffset > 0 && <div className={styles.pullSpinner} />}
+      </div>
       <div className={styles.inner}>
         <header className={styles.header}>
           <span className={styles.kicker}>МАСТЕР</span>
           <div className={styles.headerRow}>
             <h1 className={styles.title}>Панель</h1>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className={styles.headerActions}>
               {pendingCount > 0 && (
                 <span className={styles.pendingBadge}>{pendingCount} новых</span>
+              )}
+              {notifyEnabled ? (
+                <button
+                  style={{
+                    background: 'rgba(34,197,94,0.12)',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '6px 10px',
+                    color: '#34d399',
+                    fontSize: 14,
+                    cursor: 'default'
+                  }}
+                  disabled
+                >
+                  ✅ Уведомления включены
+                </button>
+              ) : (
+                <button
+                  onClick={enableMasterNotifications}
+                  style={{
+                    background: '#FFF9F0',
+                    border: '1px solid #EED9A5',
+                    borderRadius: 10,
+                    padding: '6px 10px',
+                    color: '#B8963E',
+                    fontSize: 14,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🔔 Включить уведомления
+                </button>
               )}
               <button
                 onClick={loadData}
                 style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  border: 'none',
+                  background: '#FFFFFF',
+                  border: '1px solid #E0D7C3',
                   borderRadius: 10,
                   padding: '6px 10px',
-                  color: 'var(--ink-60)',
+                  color: '#6F6A63',
                   fontSize: 16,
                   cursor: 'pointer'
                 }}
@@ -907,15 +1378,21 @@ export default function MasterScreen() {
           ))}
         </div>
 
-        {loading ? <p className={styles.empty}>Загрузка…</p> : (
-          <>
-            {tab === 'today'     && <TodayTab appointments={appointments} services={services} onAction={handleAction} onAddManual={openManualModal} />}
-            {tab === 'schedule'  && <ScheduleTab appointments={appointments} onAction={handleAction} onAddManual={openManualModal} />}
+        {loading ? renderEmptyState('⏳', 'Загрузка…') : (
+          <AnimatePresence mode="wait">
+            <motion.div key={tab}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}>
+            {tab === 'today'     && <TodayTab appointments={appointments} services={services} onAction={handleAction} onAddManual={openManualModal} onReschedule={setRescheduleTarget} />}
+            {tab === 'schedule'  && <ScheduleTab appointments={appointments} onAction={handleAction} onAddManual={openManualModal} onReschedule={setRescheduleTarget} />}
             {tab === 'clients'   && <ClientsTab appointments={appointments} onModalOpen={markModalOpen} onModalClose={markModalClosed} />}
             {tab === 'services'  && <ServicesTab />}
             {tab === 'analytics' && <AnalyticsTab appointments={appointments} services={services} />}
             {tab === 'graph'     && <GraphTab />}
-          </>
+            </motion.div>
+          </AnimatePresence>
         )}
       </div>
 
@@ -927,6 +1404,25 @@ export default function MasterScreen() {
             onSave={loadData}
             onModalOpen={markModalOpen}
             onModalClose={markModalClosed}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {pendingAction && (
+          <ActionCommentModal
+            action={pendingAction.action}
+            appointment={pendingAction.appointment}
+            onConfirm={executeAction}
+            onCancel={() => setPendingAction(null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {rescheduleTarget && (
+          <RescheduleModal
+            appointment={rescheduleTarget}
+            onConfirm={handleReschedule}
+            onCancel={() => setRescheduleTarget(null)}
           />
         )}
       </AnimatePresence>

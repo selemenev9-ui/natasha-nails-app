@@ -62,10 +62,13 @@ export default function App() {
   const [route, setRoute] = useState('profile');
   const [isConfirm, setIsConfirm] = useState(false);
   const [isSplashVisible, setIsSplashVisible] = useState(true);
+  const [preSelectedService, setPreSelectedService] = useState(null);
   const currentScreen = route;
 
-  const navigate = (next) => {
+  const navigate = (next, params = {}) => {
     if (!ROUTES.includes(next)) return;
+    if (params?.serviceId) setPreSelectedService(params);
+    else setPreSelectedService(null);
     setRoute(next);
   };
 
@@ -101,9 +104,16 @@ export default function App() {
           exit="exit"
           style={{ width: '100%', height: '100%' }}
         >
-          {currentScreen === 'booking' && <BookingScreen onNavigate={navigate} onConfirmChange={setIsConfirm} />}
+          {currentScreen === 'booking' && (
+            <BookingScreen
+              onNavigate={navigate}
+              onConfirmChange={setIsConfirm}
+              preSelectedService={preSelectedService}
+              onServiceConsumed={() => setPreSelectedService(null)}
+            />
+          )}
           {currentScreen === 'info' && <InfoScreen />}
-          {currentScreen === 'profile' && <ProfileScreen />}
+          {currentScreen === 'profile' && <ProfileScreen onNavigate={navigate} />}
           {currentScreen === 'master' && <MasterScreen />}
         </motion.div>
       </AnimatePresence>

@@ -1284,10 +1284,7 @@ export default function MasterScreen() {
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [chatAppointment, setChatAppointment] = useState(null);
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
-  const [notifyEnabled, setNotifyEnabled] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return Boolean(localStorage.getItem('master_notify_allowed'));
-  });
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
   const modalOpenRef = useRef(false);
   const hasLoadedOnce = useRef(false);
   const pullStart = useRef(null);
@@ -1329,6 +1326,19 @@ export default function MasterScreen() {
   const openManualModal = () => setShowModal(true);
   const closeManualModal = () => setShowModal(false);
 
+  useEffect(() => {
+    bridge.send('VKWebAppStorageGet', { keys: ['master_notify_allowed'] })
+      .then((data) => {
+        const val = data?.keys?.find(k => k.key === 'master_notify_allowed')?.value;
+        if (val === '1') setNotifyEnabled(true);
+      })
+      .catch(() => {
+        if (typeof window !== 'undefined' && localStorage.getItem('master_notify_allowed')) {
+          setNotifyEnabled(true);
+        }
+      });
+  }, []);
+
   const enableMasterNotifications = useCallback(async () => {
     if (notifyEnabled) return;
     try {
@@ -1337,11 +1347,18 @@ export default function MasterScreen() {
         key: 'master_notify'
       });
       if (result?.result) {
-        localStorage.setItem('master_notify_allowed', '1');
+        await bridge.send('VKWebAppStorageSet', {
+          key: 'master_notify_allowed',
+          value: '1'
+        }).catch(() => {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('master_notify_allowed', '1');
+          }
+        });
         setNotifyEnabled(true);
       }
     } catch (e) {
-      // пользователь отказал — ничего не делаем
+      console.log('Notify result error:', e);
     }
   }, [notifyEnabled]);
 

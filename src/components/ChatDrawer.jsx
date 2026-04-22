@@ -68,6 +68,61 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     setSending(false);
   };
 
+  const compressImage = (file) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1200;
+        const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const sendPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || sending) return;
+    setSending(true);
+    try {
+      const dataUrl = await compressImage(file);
+      const base64 = dataUrl.split(',')[1];
+      const uploadRes = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'upload_photo',
+          image_base64: base64,
+          content_type: 'image/jpeg',
+          appointment_id: appointmentId
+        })
+      });
+      const { url } = await uploadRes.json();
+      if (url) {
+        await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'send_message',
+            appointment_id: appointmentId,
+            sender_id: currentUserId,
+            sender_name: currentUserName,
+            text: `[photo]${url}`
+          })
+        });
+        await load();
+      }
+    } catch {}
+    setSending(false);
+    e.target.value = '';
+  };
+
   const handleKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   };
@@ -202,7 +257,23 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                     wordBreak: 'break-word',
                     boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
                   }}>
-                    {m.text}
+                    {m.text?.startsWith('[photo]') ? (
+                      <img
+                        src={m.text.replace('[photo]', '')}
+                        alt="фото"
+                        style={{
+                          maxWidth: '100%',
+                          borderRadius: 12,
+                          display: 'block',
+                          maxHeight: 260,
+                          objectFit: 'cover',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => window.open(m.text.replace('[photo]', ''), '_blank')}
+                      />
+                    ) : (
+                      m.text
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 3, marginLeft: 4, marginRight: 4 }}>
                     <span style={{ fontSize: 11, color: '#bbb' }}>{formatTs(m.created_at)}</span>
@@ -275,6 +346,19 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           >
             😊
           </button>
+          <label style={{
+            background: 'none', border: 'none', fontSize: 22,
+            cursor: 'pointer', padding: '6px', borderRadius: 10,
+            lineHeight: 1, flexShrink: 0, display: 'flex', alignItems: 'center'
+          }}>
+            📷
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={sendPhoto}
+            />
+          </label>
           <textarea
             ref={inputRef}
             value={text}

@@ -159,9 +159,37 @@ function TodayTab({ appointments, services, onAction, onAddManual }) {
     .sort((a, b) => a.appointment_date - b.appointment_date);
 
   const pending = appointments.filter(a => a.status === 'pending');
+  const activeToday = todayAppts.filter(a => a.status !== 'cancelled');
+  const todayRevenue = activeToday.reduce((s, a) => s + (a.total_price || 0), 0);
+  const nextAppt = activeToday.find(a => {
+    const ms = a.appointment_date > 1e10 ? a.appointment_date : a.appointment_date * 1000;
+    return ms > Date.now();
+  });
+  const greetingHour = new Date().getHours();
+  const greeting = greetingHour < 12 ? 'Доброе утро' : greetingHour < 17 ? 'Добрый день' : 'Добрый вечер';
 
   return (
     <div className={styles.tabContent}>
+      {/* Виджет дня */}
+      <div className={`${styles.card} glass-panel`}
+        style={{ background: 'linear-gradient(135deg, rgba(76,29,149,0.3), rgba(120,53,15,0.2))', borderLeft: '3px solid rgba(76,29,149,0.8)' }}>
+        <p className={styles.cardTitle}>{greeting}, Наташа! ✨</p>
+        {activeToday.length === 0 ? (
+          <p className={styles.cardSub}>Сегодня записей нет — можно отдохнуть 💅</p>
+        ) : (
+          <>
+            <p className={styles.cardSub}>
+              Сегодня {activeToday.length} клиент{activeToday.length === 1 ? '' : activeToday.length < 5 ? 'а' : 'ов'} · ожидаемый доход {todayRevenue.toLocaleString('ru-RU')} ₽
+            </p>
+            {nextAppt && (
+              <p className={styles.cardSub}>
+                ⏰ Следующий: {nextAppt.client_name || `VK: ${nextAppt.client_id}`} в {tsToTime(nextAppt.appointment_date)}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Новые заявки */}
       {pending.length > 0 && (
         <div className={styles.pendingBlock}>

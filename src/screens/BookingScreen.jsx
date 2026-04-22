@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import bridge from '@vkontakte/vk-bridge';
 import { AnimatePresence, motion } from 'framer-motion';
 import ServiceConstructor from '../components/ServiceConstructor.jsx';
 import BookingModal from '../components/BookingModal.jsx';
@@ -120,6 +121,22 @@ export default function BookingScreen({ onConfirmChange }) {
     }
     return 0;
   };
+
+  async function requestMessagesPermission() {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem('vk_messages_allowed')) return;
+    try {
+      const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
+        group_id: 237746914,
+        key: 'notify_booking'
+      });
+      if (result?.result) {
+        localStorage.setItem('vk_messages_allowed', '1');
+      }
+    } catch (e) {
+      // пользователь отказал — просто продолжаем
+    }
+  }
 
   const handleBookingRequest = async (payload) => {
     if (!payload?.service) {
@@ -333,6 +350,7 @@ export default function BookingScreen({ onConfirmChange }) {
               totalPrice: payload.totalPrice || getNumericPrice(payload.service)
             });
             onConfirmChange?.(true);
+            requestMessagesPermission();
           } catch (err) {
             setBookingError(err.message || 'Не удалось создать запись.');
           } finally {

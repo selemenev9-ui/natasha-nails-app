@@ -1,0 +1,5 @@
+When editing cloud-functions/natasha-api/index.js:
+- NEVER rewrite the entire file
+- Use targeted edits only (find specific lines and replace/append)
+- After any edit, verify the last 10 lines of the file are intact
+- The file must always end with: }); at the last line

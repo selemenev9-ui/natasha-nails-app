@@ -626,7 +626,7 @@ export default function MasterScreen() {
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    const interval = setInterval(loadData, 30000);
+    const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -661,9 +661,25 @@ export default function MasterScreen() {
           <span className={styles.kicker}>МАСТЕР</span>
           <div className={styles.headerRow}>
             <h1 className={styles.title}>Панель</h1>
-            {pendingCount > 0 && (
-              <span className={styles.pendingBadge}>{pendingCount} новых</span>
-            )}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {pendingCount > 0 && (
+                <span className={styles.pendingBadge}>{pendingCount} новых</span>
+              )}
+              <button
+                onClick={loadData}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: 'none',
+                  borderRadius: 10,
+                  padding: '6px 10px',
+                  color: 'var(--ink-60)',
+                  fontSize: 16,
+                  cursor: 'pointer'
+                }}
+              >
+                ↻
+              </button>
+            </div>
           </div>
         </header>
 

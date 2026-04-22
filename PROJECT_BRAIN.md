@@ -43,32 +43,28 @@
 - LEFT JOIN без AS возвращает колонки с префиксом "a.id" — всегда писать явные алиасы AS
 
 ## Текущий фокус
-- ~~Этап 1: ProfileScreen — история визитов~~ ✅
-- ~~Этап 2: MasterScreen — записи + полный CRUD услуг~~ ✅
-- ~~Этап 3: Политика конфиденциальности + онбординг~~ ✅
-- ~~Деплой GitHub Pages~~ ✅
-- VK Dev: создано приложение ID 54555974, URL вставлен ✅
-- Ожидаем иконки от дизайнера → загрузить в Оформление → подать на модерацию
-- Этап 4: Уведомления VK Notify (после модерации)
-- Этап 5: Master Analytics (In-App дашборд с премиальным UI для просмотра статистики: выручка, клиенты, топ услуг. Интеграция с YDB)
-- Этап 6: Визуальный рефакторинг (Quiet Luxury & Clean Editorial)
-- Вкладка «Портфолио» утверждена к удалению.
-## Текущий фокус
-- ~~Этап 1: ProfileScreen — история визитов~~ ✅
-- ~~Этап 2: MasterScreen — полный CRUD + 5 вкладок~~ ✅
-- ~~Этап 3: Политика конфиденциальности~~ ✅
-- ~~Этап 4: Деплой GitHub Pages + VK Dev~~ ✅
-- ~~Этап 5: Выбор даты/времени при записи~~ ✅
-- ~~Этап 6: Статусы записей (pending→confirmed→completed)~~ ✅
-- Следующее: показывать имя клиента вместо VK ID в мастер-панели
-- Потом: блокировка уже занятых слотов при выборе времени
-- Потом: вкладка График (выходные, рабочие часы)
-- Потом: уведомления VK Notify
+- ~~Этап 1-6~~ ✅ всё что было
+- ~~Этап 7: График работы (выходные, рабочие часы)~~ ✅
+- ~~Этап 8: Занятые слоты блокируются~~ ✅
+- ~~Этап 9: Имена клиентов~~ ✅
+- **Следующие шаги:**
+  1. Уведомления VK Notify (после публикации)
+  2. Дизайн мастер-панели (функционал уже готов, нужен визуал)
 
 ## Booking flow (финальный)
-1. Клиент выбирает услугу → модификаторы → дату/время → POST status=pending
-2. Наташа видит в "Сегодня" → подтверждает → status=confirmed
-3. После визита → "Выполнено" → status=completed
+1. Клиент выбирает услугу → дата/время (с учётом выходных и рабочих часов) → POST pending
+2. Наташа подтверждает → confirmed
+3. После визита → completed
+
+## Таблицы YDB (финальные)
+- **appointments**: id, client_id, service_id, appointment_date, status, total_price, client_name, client_phone, notes, confirmed_at
+- **services**: id, category, title, price, duration_minutes, is_active
+- **clients**: id, vk_id, first_name, phone, registered_at
+- **availability**: id, date, start_time, end_time, is_day_off
+
+## API actions (все рабочие)
+- **GET**: history, all_appointments, all_services, availability, all_clients, busy_slots, day_config
+- **POST**: update_service, add_service, delete_service, confirm_appointment, cancel_appointment, complete_appointment, add_appointment, set_availability, (default: create booking)
 
 ## VK App
 - App ID: 54555974
@@ -86,6 +82,10 @@
 - 123456789 — тестовый локалхост, убрать перед финальным деплоем
 
 ## Деплой
+- GitHub: https://github.com/selemenev9-ui/natasha-nails-app (public)
+- Pages: https://selemenev9-ui.github.io/natasha-nails-app/
+- VK App ID: 54555974
+- Облако: https://functions.yandexcloud.net/d4eb8ife6rqecrip6jp3
 -  задеплоено в VK (есть группа, передать Наташе позже)
 - Локально: npm run dev
 - **Правило:** `npm run deploy` / публикации в `gh-pages` запускать **только после явного разрешения Наташи** (никаких самостоятельных деплоев во время экспериментов).

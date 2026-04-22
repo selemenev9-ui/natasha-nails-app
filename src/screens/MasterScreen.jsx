@@ -492,39 +492,60 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
 }
 
 // ─── ANALYTICS TAB ────────────────────────────────────────────────────────────
-function AnalyticsTab({ appointments }) {
+function AnalyticsTab({ appointments, services }) {
   if (!appointments.length) return <p className={styles.empty}>Нет данных</p>;
 
   const now = new Date();
   const thisMonth = appointments.filter(a => {
     const d = new Date(a.appointment_date > 1e10 ? a.appointment_date : a.appointment_date * 1000);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    return d.getUTCMonth() === now.getUTCMonth() && d.getUTCFullYear() === now.getUTCFullYear();
+  });
+  const thisWeek = appointments.filter(a => {
+    const ms = a.appointment_date > 1e10 ? a.appointment_date : a.appointment_date * 1000;
+    return (Date.now() - ms) < 7 * 86400 * 1000;
   });
 
   const monthRevenue = thisMonth.reduce((s, a) => s + (a.total_price || 0), 0);
+  const weekRevenue  = thisWeek.reduce((s, a) => s + (a.total_price || 0), 0);
   const totalRevenue = appointments.reduce((s, a) => s + (a.total_price || 0), 0);
-  const completed = appointments.filter(a => a.status === 'completed').length;
-
-  const serviceCounts = {};
-  appointments.forEach(a => {
-    const n = a.title || a.service_id;
-    serviceCounts[n] = (serviceCounts[n] || 0) + 1;
-  });
-  const topServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
-
+  const completed    = appointments.filter(a => a.status === 'completed').length;
   const uniqueClients = new Set(appointments.map(a => a.client_id)).size;
   const repeatClients = Object.values(
-    appointments.reduce((acc, a) => {
-      acc[a.client_id] = (acc[a.client_id] || 0) + 1;
-      return acc;
-    }, {})
+    appointments.reduce((acc, a) => { acc[a.client_id] = (acc[a.client_id] || 0) + 1; return acc; }, {})
   ).filter(v => v > 1).length;
+
+  // Выручка в час по услугам
+  const serviceStats = {};
+  appointments.forEach(a => {
+    const key = a.title || a.service_id;
+    const svc = services.find(s => s.id === a.service_id);
+    const mins = svc?.durationMinutes || svc?.duration_minutes || 60;
+    if (!serviceStats[key]) serviceStats[key] = { revenue: 0, count: 0, totalMins: 0 };
+    serviceStats[key].revenue    += a.total_price || 0;
+    serviceStats[key].count      += 1;
+    serviceStats[key].totalMins  += mins;
+  });
+  const serviceRating = Object.entries(serviceStats)
+    .map(([name, s]) => ({
+      name,
+      count: s.count,
+      revenue: s.revenue,
+      perHour: s.totalMins > 0 ? Math.round(s.revenue / s.totalMins * 60) : 0
+    }))
+    .sort((a, b) => b.perHour - a.perHour);
 
   return (
     <div className={styles.tabContent}>
+
+      {/* Период */}
       <div className={styles.analyticsGrid}>
         <div className={`${styles.analyticsCard} glass-panel`}>
-          <span className={styles.statLabel}>Выручка за месяц</span>
+          <span className={styles.statLabel}>За неделю</span>
+          <span className={styles.statNumber}>{weekRevenue.toLocaleString('ru-RU')} ₽</span>
+          <span className={styles.statSub}>{thisWeek.length} записей</span>
+        </div>
+        <div className={`${styles.analyticsCard} glass-panel`}>
+          <span className={styles.statLabel}>За месяц</span>
           <span className={styles.statNumber}>{monthRevenue.toLocaleString('ru-RU')} ₽</span>
           <span className={styles.statSub}>{thisMonth.length} записей</span>
         </div>
@@ -538,16 +559,25 @@ function AnalyticsTab({ appointments }) {
           <span className={styles.statNumber}>{uniqueClients}</span>
           <span className={styles.statSub}>{repeatClients} постоянных</span>
         </div>
-        <div className={`${styles.analyticsCard} glass-panel`} style={{ gridColumn: '1 / -1' }}>
-          <span className={styles.statLabel}>Топ услуги</span>
-          {topServices.map(([name, count]) => (
-            <div key={name} className={styles.topServiceRow}>
-              <span className={styles.topServiceName}>{name}</span>
-              <span className={styles.topServiceCount}>{count}×</span>
-            </div>
-          ))}
-        </div>
       </div>
+
+      {/* Рейтинг услуг по выручке в час */}
+      <p className={styles.groupLabel}>💰 Рейтинг услуг (выручка/час)</p>
+      {serviceRating.map((s, i) => (
+        <div key={s.name} className={`${styles.card} glass-panel`}>
+          <div className={styles.cardRow}>
+            <div>
+              <p className={styles.cardTitle}>
+                {i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : ''}{s.name}
+              </p>
+              <p className={styles.cardSub}>{s.count} раз · {s.revenue.toLocaleString('ru-RU')} ₽ итого</p>
+            </div>
+            <div className={styles.cardRight}>
+              <p className={styles.cardPrice}>{s.perHour.toLocaleString('ru-RU')} ₽/ч</p>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -855,7 +885,7 @@ export default function MasterScreen() {
             {tab === 'schedule'  && <ScheduleTab appointments={appointments} onAction={handleAction} onAddManual={openManualModal} />}
             {tab === 'clients'   && <ClientsTab appointments={appointments} onModalOpen={markModalOpen} onModalClose={markModalClosed} />}
             {tab === 'services'  && <ServicesTab />}
-            {tab === 'analytics' && <AnalyticsTab appointments={appointments} />}
+            {tab === 'analytics' && <AnalyticsTab appointments={appointments} services={services} />}
             {tab === 'graph'     && <GraphTab />}
           </>
         )}

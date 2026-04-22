@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import BeautyCard from '../components/BeautyCard.jsx';
 import CareAccordion from '../components/CareAccordion.jsx';
 import { getDailyTips } from '../data/careHub';
 import { API_URL } from '../utils/config.js';
+import ChatDrawer from '../components/ChatDrawer.jsx';
+
 import styles from './ProfileScreen.module.css';
 
 function formatDate(timestamp) {
@@ -15,7 +17,8 @@ function formatDate(timestamp) {
   return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function HistorySection({ clientId, onNavigate }) {
+function HistorySection({ clientId, onNavigate, onChatRequest }) {
+
   const [appointments, setAppointments] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -124,6 +127,9 @@ function HistorySection({ clientId, onNavigate }) {
                 <button type="button" className={styles.cancelBtn} onClick={handleCancel}>
                   Отменить
                 </button>
+                <button type="button" className={styles.rescheduleBtn} onClick={() => onChatRequest?.(upcoming)}>
+                  💬 Написать мастеру
+                </button>
               </div>
             ) : (
               <p className={styles.soonNote}>
@@ -175,6 +181,7 @@ export default function ProfileScreen({ onNavigate }) {
   const firstName = user?.first_name || 'гость';
   const avatar = user?.photo_200 || '';
   const [dailyMix, setDailyMix] = useState([]);
+  const [chatAppt, setChatAppt] = useState(null);
 
   useEffect(() => {
     if (isBridgeLoading) return;
@@ -208,7 +215,12 @@ export default function ProfileScreen({ onNavigate }) {
         {/* История визитов */}
         <section className={styles.beautyIdSection}>
           <p className={styles.sectionLabel}>Мои визиты</p>
-          <HistorySection clientId={user?.id ? String(user.id) : null} onNavigate={onNavigate} />
+          <HistorySection
+            clientId={user?.id ? String(user.id) : null}
+            onNavigate={onNavigate}
+            onChatRequest={setChatAppt}
+          />
+
         </section>
 
         {/* Beauty ID */}
@@ -230,6 +242,16 @@ export default function ProfileScreen({ onNavigate }) {
           <button className="btn-ink" onClick={openAdmin}>Написать администратору</button>
         </footer>
       </div>
+      <AnimatePresence>
+        {chatAppt && (
+          <ChatDrawer
+            appointmentId={chatAppt.id}
+            currentUserId={String(user?.id || '')}
+            currentUserName={user?.first_name || 'Клиент'}
+            onClose={() => setChatAppt(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

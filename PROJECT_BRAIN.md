@@ -44,15 +44,17 @@
 
 ## Текущий фокус
 - ~~Этап 1-9~~ ✅
-- ~~Уведомления VK~~ ✅ (confirm → клиенту, cancel → клиенту, новая запись → мастеру)
+- ~~Уведомления VK~~ ✅
 - ~~Дизайн мастер-панели~~ ✅ (светлая тема, аватары, таймлайн, свайпы, бар-чарт)
-- ~~Напоминания~~ ✅ (за 24ч и 2ч клиенту, утренняя сводка мастеру — natasha-notify cron)
+- ~~Напоминания~~ ✅ (за 24ч и 2ч клиенту, утренняя сводка мастеру)
+- ~~Повторная запись в один клик~~ ✅
+- ~~Отмена/перенос клиентом~~ ✅ (если до записи > 24ч)
+- ~~Комментарии к действиям мастера~~ ✅ (уходят клиенту в VK)
+- ~~Перенос записи мастером~~ ✅ (новая pending + VK уведомление)
 - **Следующие шаги:**
-  1. Повторная запись в один клик (в истории клиента)
-  2. Отмена клиентом (если до записи > 24ч)
-  3. Статус оплаты (наличные / перевод / не оплачено)
-  4. Теги клиентов (VIP, новый, постоянный)
-  5. Убрать 123456789 из MASTER_IDS перед финальным деплоем
+  1. Теги клиентов (VIP, Постоянный, Новый — автоматические)
+  2. Чат внутри приложения (таблица messages в YDB)
+  3. Убрать 123456789 из MASTER_IDS перед финальным деплоем
 
 ## Booking flow (финальный)
 1. Клиент выбирает услугу → дата/время (с учётом выходных и рабочих часов) → POST pending
@@ -66,8 +68,8 @@
 - **availability**: id, date, start_time, end_time, is_day_off
 
 ## API actions (все рабочие)
-- **GET**: history, all_appointments, all_services, availability, all_clients, busy_slots, day_config
-- **POST**: update_service, add_service, delete_service, confirm_appointment, cancel_appointment, complete_appointment, add_appointment, set_availability, (default: create booking)
+- **GET**: history, all_appointments, all_services, availability, all_clients, busy_slots, day_config, client_notes
+- **POST**: update_service, add_service, delete_service, confirm_appointment, cancel_appointment, complete_appointment, add_appointment, set_availability, reschedule_appointment, save_client_notes, (default: create booking)
 
 ## VK App
 - App ID: 54555974

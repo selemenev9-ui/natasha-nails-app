@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import { API_URL } from '../utils/config.js';
 import styles from './MasterScreen.module.css';
+import ChatDrawer from '../components/ChatDrawer.jsx';
 
 const MASTER_IDS = ['80557585', '187729875', '123456789'];
 const CATEGORIES = [
@@ -180,7 +181,7 @@ function todayKey() {
 }
 
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
-function TodayTab({ appointments, services, onAction, onAddManual, onReschedule }) {
+function TodayTab({ appointments, services, onAction, onAddManual, onReschedule, onChat }) {
   const today = todayKey();
   const todayAppts = appointments
     .filter(a => dateKey(a.appointment_date) === today)
@@ -275,7 +276,14 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule 
         <div className={styles.pendingBlock}>
           <p className={styles.groupLabel}>🔔 Новые заявки — {pending.length}</p>
           {pending.map(a => (
-            <AppCard key={a.id} a={a} onAction={onAction} onReschedule={onReschedule} showActions />
+            <AppCard
+              key={a.id}
+              a={a}
+              onAction={onAction}
+              onReschedule={onReschedule}
+              onChat={onChat}
+              showActions
+            />
           ))}
         </div>
       )}
@@ -315,7 +323,7 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule 
 }
 
 // ─── APP CARD ─────────────────────────────────────────────────────────────────
-function AppCard({ a, onAction, showActions, onReschedule }) {
+function AppCard({ a, onAction, showActions, onReschedule, onChat }) {
   const st = STATUS_LABELS[a.status] || STATUS_LABELS.pending;
   const [expanded, setExpanded] = useState(false);
   const clientLabel = normalizeName(a.client_name || `VK: ${a.client_id}`);
@@ -424,6 +432,11 @@ function AppCard({ a, onAction, showActions, onReschedule }) {
                     ↺ Перенести
                   </button>
                 )}
+                {onChat && (
+                  <button className={styles.btnEdit} onClick={() => onChat(a)}>
+                    💬
+                  </button>
+                )}
               </div>
             )}
             {a.status === 'confirmed' && (
@@ -437,6 +450,11 @@ function AppCard({ a, onAction, showActions, onReschedule }) {
                 {onReschedule && (
                   <button className={styles.btnEdit} onClick={() => onReschedule(a)}>
                     ↺ Перенести
+                  </button>
+                )}
+                {onChat && (
+                  <button className={styles.btnEdit} onClick={() => onChat(a)}>
+                    💬
                   </button>
                 )}
               </div>
@@ -455,7 +473,7 @@ function AppCard({ a, onAction, showActions, onReschedule }) {
 }
 
 // ─── SCHEDULE TAB ─────────────────────────────────────────────────────────────
-function ScheduleTab({ appointments, onAction, onAddManual, onReschedule }) {
+function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -491,7 +509,16 @@ function ScheduleTab({ appointments, onAction, onAddManual, onReschedule }) {
 
       {dayAppts.length === 0
         ? <p className={styles.empty}>Записей нет</p>
-        : dayAppts.map(a => <AppCard key={a.id} a={a} onAction={onAction} onReschedule={onReschedule} showActions />)
+        : dayAppts.map((a) => (
+            <AppCard
+              key={a.id}
+              a={a}
+              onAction={onAction}
+              onReschedule={onReschedule}
+              onChat={onChat}
+              showActions
+            />
+          ))
       }
 
       <button className={styles.btnAdd} onClick={onAddManual}>+ Добавить запись</button>
@@ -1142,6 +1169,7 @@ export default function MasterScreen() {
   const [showModal, setShowModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [chatAppointment, setChatAppointment] = useState(null);
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
   const [notifyEnabled, setNotifyEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -1385,8 +1413,25 @@ export default function MasterScreen() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}>
-            {tab === 'today'     && <TodayTab appointments={appointments} services={services} onAction={handleAction} onAddManual={openManualModal} onReschedule={setRescheduleTarget} />}
-            {tab === 'schedule'  && <ScheduleTab appointments={appointments} onAction={handleAction} onAddManual={openManualModal} onReschedule={setRescheduleTarget} />}
+            {tab === 'today'     && (
+              <TodayTab
+                appointments={appointments}
+                services={services}
+                onAction={handleAction}
+                onAddManual={openManualModal}
+                onReschedule={setRescheduleTarget}
+                onChat={setChatAppointment}
+              />
+            )}
+            {tab === 'schedule'  && (
+              <ScheduleTab
+                appointments={appointments}
+                onAction={handleAction}
+                onAddManual={openManualModal}
+                onReschedule={setRescheduleTarget}
+                onChat={setChatAppointment}
+              />
+            )}
             {tab === 'clients'   && <ClientsTab appointments={appointments} onModalOpen={markModalOpen} onModalClose={markModalClosed} />}
             {tab === 'services'  && <ServicesTab />}
             {tab === 'analytics' && <AnalyticsTab appointments={appointments} services={services} />}
@@ -1423,6 +1468,16 @@ export default function MasterScreen() {
             appointment={rescheduleTarget}
             onConfirm={handleReschedule}
             onCancel={() => setRescheduleTarget(null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {chatAppointment && (
+          <ChatDrawer
+            appointmentId={chatAppointment.id}
+            currentUserId={user?.id}
+            currentUserName={user?.first_name || 'Мастер'}
+            onClose={() => setChatAppointment(null)}
           />
         )}
       </AnimatePresence>

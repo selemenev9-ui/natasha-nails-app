@@ -15,10 +15,14 @@ const BASE_TABS = [
 
 const MASTER_TAB = { id: 'master', label: 'Мастер', icon: IconMaster };
 
-export default function TabBar({ active = 'profile', onChange, isHidden = false }) {
+export default function TabBar({ active = 'profile', onChange, isHidden = false, chatUnread = 0 }) {
   const { user } = useVK();
   const isMaster = MASTER_IDS.includes(String(user?.id));
-  const tabs = isMaster ? [...BASE_TABS, MASTER_TAB] : BASE_TABS;
+  const tabs = (isMaster ? [...BASE_TABS, MASTER_TAB] : BASE_TABS).map((tab) =>
+    tab.id === 'chat'
+      ? { ...tab, unread: chatUnread }
+      : tab
+  );
 
   return (
     <nav
@@ -45,6 +49,9 @@ function MagneticTab({ tab, isActive, onChange }) {
       >
         <div className={styles.iconWrap}>
           <Icon active={isActive} />
+          {tab.unread > 0 && (
+            <span className={styles.unreadBadge}>{tab.unread > 99 ? '99+' : tab.unread}</span>
+          )}
           {isActive && (
             <motion.span layoutId="tab-dot" className={styles.dot}
               transition={{ type: 'spring', stiffness: 400, damping: 28 }} />

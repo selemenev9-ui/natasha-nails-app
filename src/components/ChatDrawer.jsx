@@ -11,7 +11,8 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const load = async () => {
     if (!appointmentId) return;
     try {
-      const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}`);
+      const viewerQuery = currentUserId ? `&viewer_id=${currentUserId}` : '';
+      const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}`);
       const data = await res.json();
       setMessages(data.messages || []);
     } catch (e) {
@@ -20,10 +21,23 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   };
 
   useEffect(() => {
+    if (!appointmentId || !currentUserId) return;
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'mark_read',
+        appointment_id: appointmentId,
+        viewer_id: currentUserId
+      })
+    }).catch(() => {});
+  }, [appointmentId, currentUserId]);
+
+  useEffect(() => {
     load();
     const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
-  }, [appointmentId]);
+  }, [appointmentId, currentUserId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -64,6 +78,18 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     const ms = ts > 1e10 ? ts : ts * 1000;
     const date = new Date(ms);
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const formatMsgDate = (ts) => {
+    if (!ts) return '';
+    const ms = ts > 1e10 ? ts : ts * 1000;
+    const date = new Date(ms);
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (date.toDateString() === now.toDateString()) return 'Сегодня';
+    if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
   };
 
   return (
@@ -131,36 +157,56 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                 Сообщений пока нет — начните диалог!
               </p>
             )}
-            {messages.map((m) => {
+            {messages.map((m, index) => {
+              const prev = messages[index - 1];
+              const curMs = m.created_at > 1e10 ? m.created_at : m.created_at * 1000;
+              const prevMs = prev?.created_at ? (prev.created_at > 1e10 ? prev.created_at : prev.created_at * 1000) : null;
+              const showDate = !prevMs || new Date(curMs).toDateString() !== new Date(prevMs).toDateString();
               const isOwn = String(m.sender_id) === String(currentUserId);
               return (
-                <div
-                  key={m.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: isOwn ? 'flex-end' : 'flex-start'
-                  }}
-                >
-                  {!isOwn && (
-                    <span style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>
-                      {m.sender_name || 'Собеседник'}
-                    </span>
+                <div key={m.id || `${curMs}-${index}`}>
+                  {showDate && (
+                    <div style={{ textAlign: 'center', margin: '12px 0 8px' }}>
+                      <span style={{ background: '#f0ebe4', borderRadius: 12, padding: '3px 12px', fontSize: 12, color: '#888' }}>
+                        {formatMsgDate(m.created_at)}
+                      </span>
+                    </div>
                   )}
                   <div
                     style={{
-                      maxWidth: '75%',
-                      padding: '8px 12px',
-                      borderRadius: isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                      background: isOwn ? '#B8963E' : '#F5F0EB',
-                      color: isOwn ? '#fff' : '#1A1A1A',
-                      fontSize: 14,
-                      lineHeight: 1.4
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: isOwn ? 'flex-end' : 'flex-start'
                     }}
                   >
-                    {m.text}
+                    {!isOwn && (
+                      <span style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>
+                        {m.sender_name || 'Собеседник'}
+                      </span>
+                    )}
+                    <div
+                      style={{
+                        maxWidth: '75%',
+                        padding: '8px 12px',
+                        borderRadius: isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                        background: isOwn ? '#B8963E' : '#F5F0EB',
+                        color: isOwn ? '#fff' : '#1A1A1A',
+                        fontSize: 14,
+                        lineHeight: 1.4,
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {m.text}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                      <span style={{ fontSize: 10, color: '#bbb' }}>{formatTs(m.created_at)}</span>
+                      {isOwn && (
+                        <span style={{ fontSize: 11, color: m.is_read ? '#B8963E' : '#bbb' }}>
+                          {m.is_read ? '✓✓' : '✓'}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span style={{ fontSize: 10, color: '#bbb', marginTop: 2 }}>{formatTs(m.created_at)}</span>
                 </div>
               );
             })}

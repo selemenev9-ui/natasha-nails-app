@@ -17,12 +17,21 @@ function ChatTab({ appointments, currentUser }) {
   const [activeChatClient, setActiveChatClient] = useState(null);
   const [conversations, setConversations] = useState([]);
 
-  useEffect(() => {
+  const loadConversations = useCallback(() => {
     fetch(`${API_URL}?action=get_conversations`)
-      .then(r => r.json())
-      .then(d => setConversations(d.conversations || []))
+      .then((r) => r.json())
+      .then((d) => setConversations(d.conversations || []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  const handleChatClose = useCallback(() => {
+    setActiveChatClient(null);
+    loadConversations();
+  }, [loadConversations]);
 
   const clients = useMemo(() => {
     const map = {};
@@ -33,7 +42,8 @@ function ChatTab({ appointments, currentUser }) {
           room_id: roomId,
           client_id: a.client_id,
           name: normalizeName(a.client_name || `ID: ${a.client_id}`),
-          visits: 0
+          visits: 0,
+          unread_count: 0
         };
         map[roomId].visits += 1;
       }
@@ -47,15 +57,24 @@ function ChatTab({ appointments, currentUser }) {
           room_id: roomId,
           client_id: c.client_id,
           name: normalizeName(c.sender_name || `ID: ${c.client_id}`),
-          visits: 0
+          visits: 0,
+          unread_count: 0
         };
       }
       map[roomId].lastMessage = c.last_message;
       map[roomId].lastTime = c.last_time;
+      map[roomId].unread_count = c.unread_count || 0;
     });
 
-    return Object.values(map);
+    return Object.values(map).sort((a, b) => (b.lastTime || 0) - (a.lastTime || 0));
   }, [appointments, conversations]);
+
+  const formatTs = (ts) => {
+    if (!ts) return '';
+    const ms = ts > 1e10 ? ts : ts * 1000;
+    const d = new Date(ms);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
 
   if (!clients.length) {
     return <p style={{ textAlign: 'center', color: '#aaa', padding: 40 }}>Клиентов пока нет</p>;
@@ -63,13 +82,13 @@ function ChatTab({ appointments, currentUser }) {
 
   return (
     <div style={{ padding: '8px 0' }}>
-      {clients.map(c => (
+      {clients.map((c) => (
         <div
           key={c.room_id || c.client_id || c.name}
           style={{
             background: '#fff',
             borderRadius: 16,
-            padding: '14px 16px',
+            padding: '12px 16px',
             marginBottom: 8,
             display: 'flex',
             alignItems: 'center',
@@ -81,34 +100,66 @@ function ChatTab({ appointments, currentUser }) {
         >
           <div
             style={{
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               borderRadius: '50%',
               background: '#F5F0EB',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 600,
-              fontSize: 16,
-              flexShrink: 0
+              fontWeight: 700,
+              fontSize: 18,
+              flexShrink: 0,
+              position: 'relative'
             }}
           >
             {c.name?.charAt(0)?.toUpperCase() || '?'}
+            {c.unread_count > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  background: '#B8963E',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: 18,
+                  height: 18,
+                  fontSize: 11,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                {c.unread_count}
+              </span>
+            )}
           </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 600, margin: 0, fontSize: 15 }}>{c.name}</p>
-            <p style={{ color: '#aaa', margin: '2px 0 0', fontSize: 12 }}>
-              {c.visits > 0
-                ? `${c.visits} визит${c.visits === 1 ? '' : c.visits < 5 ? 'а' : 'ов'}`
-                : 'Сообщения без записи'}
-            </p>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontWeight: 600, margin: 0, fontSize: 15 }}>{c.name}</p>
+              {c.lastTime && (
+                <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0, marginLeft: 8 }}>
+                  {formatTs(c.lastTime)}
+                </span>
+              )}
+            </div>
             {c.lastMessage && (
-              <p style={{ color: '#bbb', margin: '2px 0 0', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <p
+                style={{
+                  color: '#aaa',
+                  margin: '2px 0 0',
+                  fontSize: 13,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
                 {c.lastMessage}
               </p>
             )}
           </div>
-          <span style={{ fontSize: 18, color: '#ccc' }}>›</span>
         </div>
       ))}
 
@@ -118,7 +169,7 @@ function ChatTab({ appointments, currentUser }) {
             appointmentId={activeChatClient.room_id}
             currentUserId={String(currentUser?.id)}
             currentUserName={currentUser?.first_name || 'Мастер'}
-            onClose={() => setActiveChatClient(null)}
+            onClose={handleChatClose}
           />
         )}
       </AnimatePresence>

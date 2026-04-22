@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import bridge from '@vkontakte/vk-bridge';
+import { API_URL } from './utils/config.js';
 
 import BookingScreen from './screens/BookingScreen.jsx';
 import InfoScreen from './screens/InfoScreen.jsx';
@@ -137,6 +138,7 @@ export default function App() {
   const [isConfirm, setIsConfirm] = useState(false);
   const [isSplashVisible, setIsSplashVisible] = useState(true);
   const [preSelectedService, setPreSelectedService] = useState(null);
+  const [chatUnread, setChatUnread] = useState(0);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const currentScreen = route;
 
@@ -157,6 +159,31 @@ export default function App() {
   }, [isBridgeLoading]);
 
   const showSplash = isBridgeLoading || isSplashVisible;
+
+  useEffect(() => {
+    if (isBridgeLoading || isFirstVisit) return;
+    let cancelled = false;
+    let intervalId;
+
+    const loadUnread = () => {
+      fetch(`${API_URL}?action=get_conversations`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (cancelled) return;
+          const unread = (data.conversations || []).reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
+          setChatUnread(unread);
+        })
+        .catch(() => {});
+    };
+
+    loadUnread();
+    intervalId = setInterval(loadUnread, 30000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isBridgeLoading, isFirstVisit]);
 
   useEffect(() => {
     if (isBridgeLoading || isFirstVisit) return;
@@ -257,7 +284,7 @@ export default function App() {
         </motion.div>
       </AnimatePresence>
 
-      <TabBar active={route} onChange={navigate} isHidden={isConfirm} />
+      <TabBar active={route} onChange={navigate} isHidden={isConfirm} chatUnread={chatUnread} />
 
       <AnimatePresence>{showSplash && <SplashScreen key="splash" />}</AnimatePresence>
 

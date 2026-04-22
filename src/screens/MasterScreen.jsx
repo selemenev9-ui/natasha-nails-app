@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import { API_URL } from '../utils/config.js';
@@ -307,7 +307,23 @@ function ScheduleTab({ appointments, onAction, onAddManual }) {
 }
 
 // ─── CLIENTS TAB ──────────────────────────────────────────────────────────────
-function ClientsTab({ appointments }) {
+function ClientsTab({ appointments, onModalOpen, onModalClose }) {
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const clientModalRef = useRef(false);
+
+  useEffect(() => {
+    clientModalRef.current = Boolean(selectedClient);
+  }, [selectedClient]);
+
+  useEffect(() => () => {
+    if (clientModalRef.current) {
+      onModalClose?.();
+    }
+  }, [onModalClose]);
+
   const clientMap = {};
   appointments.forEach(a => {
     const key = a.client_id;
@@ -332,13 +348,75 @@ function ClientsTab({ appointments }) {
 
   const clients = Object.values(clientMap).sort((a, b) => b.lastVisit - a.lastVisit);
 
+  // Спящие клиенты — не были более 35 дней
+  const sleepingClients = clients.filter(c => {
+    const daysSince = (Date.now() / 1000 - c.lastVisit) / 86400;
+    return daysSince > 35;
+  });
+
+  const openClient = async (c) => {
+    if (!selectedClient) onModalOpen?.();
+    setSelectedClient(c);
+    setLoadingNotes(true);
+    try {
+      const res = await fetch(`${API_URL}?action=client_notes&client_id=${c.id}`);
+      const data = await res.json();
+      setNotes(data.notes || '');
+    } catch(e) { setNotes(''); }
+    setLoadingNotes(false);
+  };
+
+  const closeClient = () => {
+    setSelectedClient(null);
+    onModalClose?.();
+  };
+
+  const saveNotes = async () => {
+    if (!selectedClient) return;
+    setSavingNotes(true);
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save_client_notes', client_id: selectedClient.id, notes })
+    });
+    setSavingNotes(false);
+  };
+
   if (!clients.length) return <p className={styles.empty}>Клиентов пока нет</p>;
 
   return (
     <div className={styles.tabContent}>
-      <p className={styles.groupLabel}>Всего клиентов: {clients.length}</p>
+
+      {/* Спящие клиенты */}
+      {sleepingClients.length > 0 && (
+        <div className={styles.pendingBlock}>
+          <p className={styles.groupLabel}>😴 Давно не было — {sleepingClients.length} чел.</p>
+          {sleepingClients.map(c => (
+            <div key={c.id} className={`${styles.card} glass-panel`}
+              style={{ borderLeft: '3px solid #f59e0b' }}>
+              <div className={styles.cardRow}>
+                <div>
+                  <p className={styles.cardTitle}>{c.name}</p>
+                  <p className={styles.cardSub}>
+                    Последний визит: {formatDate(c.lastVisit)} · {Math.round((Date.now()/1000 - c.lastVisit)/86400)} дн. назад
+                  </p>
+                </div>
+                <a href={`https://vk.com/im?sel=${c.id}`} target="_blank" rel="noreferrer"
+                  className={styles.btnSave} style={{ textDecoration: 'none', fontSize: 12 }}>
+                  Написать
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className={styles.groupLabel}>Все клиенты — {clients.length}</p>
+
       {clients.map(c => (
-        <div key={c.id} className={`${styles.card} glass-panel`}>
+        <div key={c.id} className={`${styles.card} glass-panel`}
+          style={{ cursor: 'pointer' }}
+          onClick={() => openClient(c)}>
           <div className={styles.cardRow}>
             <div>
               <p className={styles.cardTitle}>{c.name}</p>
@@ -352,6 +430,63 @@ function ClientsTab({ appointments }) {
           </div>
         </div>
       ))}
+
+      {/* Боковая панель клиента */}
+      <AnimatePresence>
+        {selectedClient && (
+          <motion.div className={styles.modalOverlay}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={closeClient}>
+            <motion.div className={`${styles.modal} glass-panel`}
+              initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }} onClick={e => e.stopPropagation()}>
+
+              <p className={styles.cardTitle}>{selectedClient.name}</p>
+              {selectedClient.phone && <p className={styles.cardSub}>📞 {selectedClient.phone}</p>}
+              <div className={styles.analyticsGrid} style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className={`${styles.analyticsCard} glass-panel`}>
+                  <span className={styles.statLabel}>Визитов</span>
+                  <span className={styles.statNumber}>{selectedClient.visits}</span>
+                </div>
+                <div className={`${styles.analyticsCard} glass-panel`}>
+                  <span className={styles.statLabel}>Потрачено</span>
+                  <span className={styles.statNumber} style={{ fontSize: 16 }}>
+                    {selectedClient.spent.toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+              </div>
+
+              <p className={styles.label}>📝 Заметки о клиенте</p>
+              {loadingNotes ? (
+                <p className={styles.cardSub}>Загрузка…</p>
+              ) : (
+                <textarea
+                  className={styles.editInput}
+                  rows={4}
+                  placeholder="Любит латте без сахара, аллергия на праймер X, кличка собаки — Буся..."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  style={{ resize: 'vertical' }}
+                />
+              )}
+
+              <div className={styles.editRow}>
+                <button className={styles.btnSave} disabled={savingNotes} onClick={saveNotes}>
+                  {savingNotes ? '…' : '💾 Сохранить'}
+                </button>
+                <a href={`https://vk.com/im?sel=${selectedClient.id}`} target="_blank" rel="noreferrer"
+                  className={styles.btnCancel} style={{ textDecoration: 'none', textAlign: 'center' }}>
+                  Написать в ВК
+                </a>
+              </div>
+
+              <button className={styles.btnCancel} onClick={closeClient}>
+                Закрыть
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -540,7 +675,7 @@ function ServicesTab() {
 }
 
 // ─── MANUAL BOOKING MODAL ─────────────────────────────────────────────────────
-function ManualBookingModal({ services, onClose, onSave }) {
+function ManualBookingModal({ services, onClose, onSave, onModalOpen, onModalClose }) {
   const [form, setForm] = useState({
     service_id: services[0]?.id || '',
     client_name: '', client_phone: '',
@@ -548,6 +683,11 @@ function ManualBookingModal({ services, onClose, onSave }) {
     total_price: '', notes: ''
   });
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    onModalOpen?.();
+    return () => onModalClose?.();
+  }, [onModalOpen, onModalClose]);
 
   const handleSave = async () => {
     if (!form.service_id || !form.date || !form.time) return;
@@ -609,6 +749,12 @@ export default function MasterScreen() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
+  const modalOpenRef = useRef(false);
+
+  useEffect(() => {
+    modalOpenRef.current = isAnyModalOpen;
+  }, [isAnyModalOpen]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -626,9 +772,19 @@ export default function MasterScreen() {
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    const interval = setInterval(loadData, 10000);
+    const interval = setInterval(() => {
+      if (!modalOpenRef.current) {
+        loadData();
+      }
+    }, 30000);
     return () => clearInterval(interval);
   }, [loadData]);
+
+  const markModalOpen = useCallback(() => setIsAnyModalOpen(true), []);
+  const markModalClosed = useCallback(() => setIsAnyModalOpen(false), []);
+
+  const openManualModal = () => setShowModal(true);
+  const closeManualModal = () => setShowModal(false);
 
   const handleAction = async (action, id) => {
     await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -695,9 +851,9 @@ export default function MasterScreen() {
 
         {loading ? <p className={styles.empty}>Загрузка…</p> : (
           <>
-            {tab === 'today'     && <TodayTab appointments={appointments} services={services} onAction={handleAction} onAddManual={() => setShowModal(true)} />}
-            {tab === 'schedule'  && <ScheduleTab appointments={appointments} onAction={handleAction} onAddManual={() => setShowModal(true)} />}
-            {tab === 'clients'   && <ClientsTab appointments={appointments} />}
+            {tab === 'today'     && <TodayTab appointments={appointments} services={services} onAction={handleAction} onAddManual={openManualModal} />}
+            {tab === 'schedule'  && <ScheduleTab appointments={appointments} onAction={handleAction} onAddManual={openManualModal} />}
+            {tab === 'clients'   && <ClientsTab appointments={appointments} onModalOpen={markModalOpen} onModalClose={markModalClosed} />}
             {tab === 'services'  && <ServicesTab />}
             {tab === 'analytics' && <AnalyticsTab appointments={appointments} />}
             {tab === 'graph'     && <GraphTab />}
@@ -707,7 +863,13 @@ export default function MasterScreen() {
 
       <AnimatePresence>
         {showModal && (
-          <ManualBookingModal services={services} onClose={() => setShowModal(false)} onSave={loadData} />
+          <ManualBookingModal
+            services={services}
+            onClose={closeManualModal}
+            onSave={loadData}
+            onModalOpen={markModalOpen}
+            onModalClose={markModalClosed}
+          />
         )}
       </AnimatePresence>
     </div>

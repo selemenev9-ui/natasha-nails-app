@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useVK } from '../contexts/VKContext';
 import styles from './ServiceConstructor.module.css';
 
 const getInitialState = (modifiersData) =>
@@ -8,6 +9,7 @@ const getInitialState = (modifiersData) =>
 
 export default function ServiceConstructor({ service, modifiersData, onBook, isSubmitting = false }) {
   const [selectedState, setSelectedState] = useState(() => getInitialState(modifiersData));
+  const { triggerHaptic } = useVK();
 
   const totalPrice = useMemo(() => {
     if (!service || !modifiersData) return 0;
@@ -21,6 +23,7 @@ export default function ServiceConstructor({ service, modifiersData, onBook, isS
   }, [modifiersData, selectedState, service]);
 
   const handleSelect = (categoryKey, optionId) => {
+    triggerHaptic?.('light');
     setSelectedState((prev) => ({
       ...prev,
       [categoryKey]: optionId
@@ -65,6 +68,7 @@ export default function ServiceConstructor({ service, modifiersData, onBook, isS
         onClick={(event) => {
           event.stopPropagation();
           if (isSubmitting) return;
+          triggerHaptic?.('heavy');
           onBook?.({ service, totalPrice, selections: selectedState, url: service?.bookingUrl || '' });
         }}
       >

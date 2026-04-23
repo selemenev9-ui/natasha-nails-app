@@ -189,26 +189,18 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
   return (
     <>
       <div className={styles.booking}>
-        <motion.div
-          className={styles.ambientGlow}
-          animate={{
-            background: `radial-gradient(circle at 35% 35%, ${CATEGORY_COLORS[glowCategory] || CATEGORY_COLORS.default}, transparent 60%), radial-gradient(circle at 70% 65%, rgba(140, 122, 107, 0.3), transparent 65%), #F7F5F0`
-          }}
-          transition={{ duration: 0.8, ease: 'easeInOut' }}
-        />
+        <div className={styles.ambientContainer} aria-hidden="true">
+          <div className={styles.auroraMesh} />
+          <div className={styles.noiseOverlay} />
+        </div>
 
         <div className={styles.contentLayer}>
-          <div className={styles.header}>
-            <h1 className={styles.title}>Меню услуг</h1>
-          </div>
-
           <motion.div
             className={styles.step}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
-            <p className={styles.sectionTitle}>Услуги</p>
             <motion.div className={styles.cardStack} ref={listRef}>
               {isLoading ? (
                 <div className={styles.loader}>Загрузка услуг…</div>
@@ -251,7 +243,7 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
                           role="button"
                           tabIndex={0}
                           data-viscous
-                          className={`${styles.serviceCard} glass-panel ${activeService?.id === service.id ? `${styles.activeCard} glass-panel-active` : ''}`}
+                          className={`${styles.serviceCard} glass-panel ${activeService?.id === service.id ? styles.activeCard : ''}`}
                           whileTap={{ scale: 0.96 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                           initial={{ opacity: 0, y: 8 }}

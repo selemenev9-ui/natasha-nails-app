@@ -137,7 +137,7 @@
 .statsRow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 .statCard {
-  padding: 14px;
+  padding: 24px 16px;
   border-radius: 14px;
   text-align: center;
   display: flex;
@@ -146,22 +146,25 @@
 }
 
 .statValue {
-  font-size: 20px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
   color: var(--ink);
 }
 
 .statLabel {
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  opacity: 0.6;
   text-transform: uppercase;
   color: var(--ink-60);
 }
 
 .upcomingCard {
-  padding: 16px;
+  padding: 20px;
   border-radius: 14px;
-  border-left: 3px solid rgba(76, 29, 149, 0.8);
+  box-shadow: inset 3px 0 0 rgba(76, 29, 149, 0.8);
 }
 
 .upcomingLabel {
@@ -228,11 +231,12 @@
 .historyList { display: flex; flex-direction: column; gap: 8px; }
 
 .historyCard {
-  padding: 14px 16px;
+  padding: 20px;
   border-radius: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  box-shadow: inset 3px 0 0 rgba(184,150,62,0.12);
 }
 
 .historyRow {

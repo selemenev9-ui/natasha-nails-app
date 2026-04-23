@@ -18,16 +18,8 @@ export default function ChatScreen() {
 
         <div style={{ padding: '20px 0' }}>
           <div
-            style={{
-              background: '#fff',
-              borderRadius: 16,
-              padding: '20px',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              cursor: 'pointer'
-            }}
+            className="glass-panel"
+            style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', padding: 20 }}
             onClick={() => setChatOpen(true)}
           >
             <div
@@ -35,7 +27,8 @@ export default function ChatScreen() {
                 width: 48,
                 height: 48,
                 borderRadius: '50%',
-                background: '#B8963E',
+                border: '1px solid var(--ink)',
+                color: 'var(--ink)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -49,7 +42,7 @@ export default function ChatScreen() {
               <p style={{ fontWeight: 600, margin: 0, fontSize: 16 }}>Natasha Premium Lab</p>
               <p style={{ color: '#888', margin: '2px 0 0', fontSize: 13 }}>Написать мастеру</p>
             </div>
-            <span style={{ marginLeft: 'auto', fontSize: 20, color: '#ccc' }}>›</span>
+            <span style={{ marginLeft: 'auto', fontSize: 20, color: 'var(--ink-30)' }}>›</span>
           </div>
         </div>
       </div>

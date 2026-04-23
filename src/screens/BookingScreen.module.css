@@ -1,21 +1,26 @@
 .booking {
   position: relative;
   min-height: 100dvh;
-  padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + var(--tabbar-space));
+  padding: calc(var(--safe-top) + 16px) 20px calc(var(--safe-bottom) + var(--tabbar-space));
   overflow: hidden;
   color: var(--ink);
 }
 
-.ambientGlow {
-  position: absolute;
-  width: 200%;
-  height: 200%;
-  top: -50%;
-  left: -50%;
-  filter: blur(95px);
-  pointer-events: none;
+.ambientContainer {
+  position: fixed;
+  inset: 0;
   z-index: 0;
-  background: #F7F5F0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 0%, #FFFFFF 0%, var(--cream) 50%, #EAE5DE 100%);
+}
+
+.noiseOverlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 1;
 }
 
 .contentLayer {
@@ -114,10 +119,23 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: 20px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.28s var(--smooth), background 0.28s var(--smooth), transform 0.22s var(--smooth);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.15) 100%) !important;
+  backdrop-filter: blur(32px) saturate(180%) brightness(105%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(105%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+  border-left: 1.5px solid rgba(255, 255, 255, 0.7) !important;
+  border-radius: 28px !important;
+  box-shadow:
+    inset 0 8px 20px rgba(255, 255, 255, 0.9),
+    inset 0 -12px 24px rgba(74, 64, 54, 0.15),
+    0 4px 10px rgba(20, 18, 16, 0.05),
+    0 24px 48px rgba(140, 122, 107, 0.25) !important;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+  z-index: 1;
 }
 
 .serviceCard:focus-visible {
@@ -150,7 +168,15 @@
 }
 
 .activeCard {
-  transform: scale(0.98);
+  transform: scale(1.02) translateY(-4px);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.2) 100%) !important;
+  box-shadow:
+    inset 0 8px 20px rgba(255, 255, 255, 0.95),
+    inset 0 -12px 24px rgba(74, 64, 54, 0.1),
+    0 8px 16px rgba(20, 18, 16, 0.08),
+    0 32px 64px rgba(100, 85, 75, 0.35) !important;
+  z-index: 10;
+  position: relative;
 }
 
 .serviceDuration {
@@ -183,8 +209,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.4);
-  border: 0.5px solid rgba(255, 255, 255, 0.85);
+  background: var(--glass-heavy);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
   margin-bottom: 16px;
   backdrop-filter: blur(30px);
@@ -214,8 +240,10 @@
   min-width: 100px;
   padding: 14px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-medium);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
@@ -224,10 +252,10 @@
 }
 
 .dateActive {
-  background: #FFFFFF;
-  color: var(--ink);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  background: var(--ink) !important;
+  color: var(--cream) !important;
+  border: none !important;
+  box-shadow: 0 8px 24px rgba(20, 18, 16, 0.25) !important;
 }
 
 .dateNum {
@@ -251,8 +279,10 @@
   padding: 18px 0;
   border-radius: 18px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--glass-medium);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   font-weight: 500;
   transition: transform 0.25s var(--spring), background 0.3s;
 }
@@ -268,10 +298,10 @@
 }
 
 .slotActive {
-  background: #FFFFFF;
-  color: var(--ink);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  background: var(--ink) !important;
+  color: var(--cream) !important;
+  border: none !important;
+  box-shadow: 0 8px 24px rgba(20, 18, 16, 0.25) !important;
 }
 
 .confirm {

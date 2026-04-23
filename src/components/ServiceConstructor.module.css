@@ -13,7 +13,7 @@
 
 .categoryTitle {
   font-size: 13px;
-  color: var(--ink-60);
+  color: rgba(28, 24, 20, 0.8);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0;
@@ -27,27 +27,39 @@
 .optionCard {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px;
-  border-radius: 16px;
-  cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.5);
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 32px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.04) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.85) !important;
+  border-left: 1.5px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.04) !important;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 12px rgba(28, 27, 26, 0.02);
 }
 
+.optionCard .optionLabel { color: var(--ink) !important; font-weight: 500; }
+.optionCard .optionPrice { color: var(--ink-60) !important; }
+
 .optionCardActive {
-  background: var(--ink) !important;
-  border-color: var(--ink) !important;
-  color: #FFFFFF !important;
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(28, 27, 26, 0.15) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.12) 100%) !important;
+  backdrop-filter: blur(24px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(150%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+  border-left: 1.5px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow:
+    inset 0 2px 4px rgba(255, 255, 255, 0.2),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.9),
+    0 12px 24px rgba(0, 0, 0, 0.25) !important;
 }
 
 .optionCardActive .optionLabel,
 .optionCardActive .optionPrice {
-  color: #FFFFFF !important;
+  color: var(--ink) !important;
+  text-shadow: none !important;
 }
 
 .optionLabel {
@@ -63,7 +75,30 @@
 
 .bookButton {
   width: 100%;
-  margin-top: 10px;
+  border: none;
+  border-radius: 38px;
+  padding: 18px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.05))
+      0 0 /
+      150% 150%,
+    linear-gradient(120deg, rgba(24, 24, 24, 0.95), rgba(0, 0, 0, 0.6));
+  backdrop-filter: blur(30px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+  color: var(--cream);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.9),
+    0 16px 32px rgba(20, 18, 16, 0.35),
+    0 4px 8px rgba(20, 18, 16, 0.2) !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6) !important;
+  font-weight: 600;
+  border-radius: 20px !important;
+  padding: 16px !important;
 }
 
 .bookButton:disabled {

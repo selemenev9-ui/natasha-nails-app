@@ -63,7 +63,7 @@ export default function ServiceConstructor({ service, modifiersData, onBook, isS
 
       <button
         type="button"
-        className={`btn-ink ${styles.bookButton}`}
+        className={styles.bookButton}
         disabled={isSubmitting}
         onClick={(event) => {
           event.stopPropagation();

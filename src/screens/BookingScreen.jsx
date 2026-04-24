@@ -360,6 +360,7 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
       <AnimatePresence>
         {confirmState ? (
           <motion.div
+            key="confirm-overlay"
             className={styles.confirm}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

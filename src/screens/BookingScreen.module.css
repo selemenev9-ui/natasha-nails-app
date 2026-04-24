@@ -515,6 +515,8 @@
 }
 
 .receiptCard {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 360px;
   border-radius: 28px;
@@ -631,6 +633,8 @@
 }
 
 .confirmActions {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 360px;
   display: flex;

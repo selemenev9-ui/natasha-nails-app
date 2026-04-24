@@ -85,80 +85,22 @@ function ChatTab({ appointments, currentUser }) {
       {clients.map((c) => (
         <div
           key={c.room_id || c.client_id || c.name}
-          style={{
-            background: '#fff',
-            borderRadius: 16,
-            padding: '12px 16px',
-            marginBottom: 8,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-          }}
+          className={styles.chatCard}
           onClick={() => setActiveChatClient(c)}
         >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
-              background: '#F5F0EB',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: 18,
-              flexShrink: 0,
-              position: 'relative'
-            }}
-          >
+          <div className={styles.chatAvatar}>
             {c.name?.charAt(0)?.toUpperCase() || '?'}
             {c.unread_count > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -2,
-                  right: -2,
-                  background: '#B8963E',
-                  color: '#fff',
-                  borderRadius: '50%',
-                  width: 18,
-                  height: 18,
-                  fontSize: 11,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                {c.unread_count}
-              </span>
+              <span className={styles.chatBadge}>{c.unread_count}</span>
             )}
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p style={{ fontWeight: 600, margin: 0, fontSize: 15 }}>{c.name}</p>
-              {c.lastTime && (
-                <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0, marginLeft: 8 }}>
-                  {formatTs(c.lastTime)}
-                </span>
-              )}
+              <p className={styles.chatName}>{c.name}</p>
+              {c.lastTime && <span className={styles.chatTime}>{formatTs(c.lastTime)}</span>}
             </div>
-            {c.lastMessage && (
-              <p
-                style={{
-                  color: '#aaa',
-                  margin: '2px 0 0',
-                  fontSize: 13,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-              >
-                {c.lastMessage}
-              </p>
-            )}
+            {c.lastMessage && <p className={styles.chatPreview}>{c.lastMessage}</p>}
           </div>
         </div>
       ))}
@@ -1531,63 +1473,28 @@ export default function MasterScreen() {
                 <span className={styles.pendingBadge}>{pendingCount} новых</span>
               )}
               {notifyEnabled ? (
-                <button
-                  style={{
-                    background: 'rgba(34,197,94,0.12)',
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '6px 10px',
-                    color: '#34d399',
-                    fontSize: 14,
-                    cursor: 'default'
-                  }}
-                  disabled
-                >
+                <button className={styles.btnNotifyActive} disabled>
                   ✅ Уведомления включены
                 </button>
               ) : (
-                <button
-                  onClick={enableMasterNotifications}
-                  style={{
-                    background: '#FFF9F0',
-                    border: '1px solid #EED9A5',
-                    borderRadius: 10,
-                    padding: '6px 10px',
-                    color: '#B8963E',
-                    fontSize: 14,
-                    cursor: 'pointer'
-                  }}
-                >
+                <button className={styles.btnNotify} onClick={enableMasterNotifications}>
                   🔔 Включить уведомления
                 </button>
               )}
-              <button
-                onClick={loadData}
-                style={{
-                  background: '#FFFFFF',
-                  border: '1px solid #E0D7C3',
-                  borderRadius: 10,
-                  padding: '6px 10px',
-                  color: '#6F6A63',
-                  fontSize: 16,
-                  cursor: 'pointer'
-                }}
-              >
-                ↻
-              </button>
+              <button className={styles.btnRefresh} onClick={loadData}>↻</button>
             </div>
           </div>
-        </header>
 
-        <div className={styles.tabsScroll}>
-          {TABS.map(t => (
-            <button key={t.id}
-              className={`${styles.tab} ${tab === t.id ? styles.tabActive : ''} glass-panel`}
-              onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+          <div className={styles.tabsScroll}>
+            {TABS.map(t => (
+              <button key={t.id}
+                className={`${styles.tab} ${tab === t.id ? styles.tabActive : ''} glass-panel`}
+                onClick={() => setTab(t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </header>
 
         {loading ? renderEmptyState('⏳', 'Загрузка…') : (
           <AnimatePresence mode="wait">

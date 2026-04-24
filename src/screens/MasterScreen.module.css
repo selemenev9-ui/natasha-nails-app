@@ -19,11 +19,6 @@
 .kicker { font-size: 12px; letter-spacing: 0.25em; color: var(--ink); text-transform: uppercase; }
 .title { font-size: 30px; font-weight: 700; color: var(--ink); margin: 0; }
 
-.pendingBadge {
-  background: rgba(239,68,68,0.12); color: #c2410c;
-  font-size: 12px; font-weight: 600;
-  padding: 4px 10px; border-radius: 20px;
-}
 .tabsScroll {
   display: flex; gap: 8px; overflow-x: auto;
   padding-bottom: 4px;
@@ -49,7 +44,7 @@
 .tabContent { display: flex; flex-direction: column; gap: 10px; }
 .groupLabel {
   font-size: 11px; text-transform: uppercase;
-  letter-spacing: 0.15em; color: #8C857B;
+  letter-spacing: 0.15em; color: var(--ink-60);
   margin: 8px 0 2px;
 }
 .pendingBlock {
@@ -89,7 +84,7 @@
 .cardTitle { font-size: 15px; font-weight: 600; color: var(--ink); margin: 0; }
 .cardPrice { font-size: 15px; font-weight: 600; color: var(--ink); margin: 0; white-space: nowrap; }
 
-.cardSub { font-size: 12px; color: #8C857B; margin: 0; }
+.cardSub { font-size: 12px; color: var(--ink-60); margin: 0; }
 .statusBadge {
   font-size: 11px; font-weight: 600;
   padding: 3px 8px; border-radius: 10px;
@@ -113,22 +108,25 @@
 }
 .btnAdd {
   width: 100%; padding: 14px; border-radius: 14px;
-  border: 1px dashed #D9C9A4;
-  background: #FFF9F0;
-  color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer;
+  border: 1px dashed rgba(100,180,255,0.25);
+  background: rgba(100,180,255,0.04);
+  color: var(--ink-60); font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
 }
+.btnAdd:active { color: var(--ink); border-color: rgba(100,180,255,0.5); }
 .btnEdit {
   font-size: 12px; color: #8C857B;
   background: none; border: none; cursor: pointer; padding: 0;
 }
 .btnSave {
   padding: 8px 14px; border-radius: 10px; border: none;
-  background: var(--ink); color: #fff;
+  background: rgba(237,244,255,0.95); color: rgba(4,12,28,0.95);
   font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .btnCancel {
-  padding: 8px 14px; border-radius: 10px; border: none;
-  background: rgba(0,0,0,0.05); color: #6F6A63;
+  padding: 8px 14px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent; color: var(--ink-60);
   font-size: 13px; cursor: pointer;
 }
 .btnDelete {
@@ -180,20 +178,26 @@
 .dayPicker::-webkit-scrollbar { display: none; }
 .dayBtn {
   display: flex; flex-direction: column; align-items: center;
-  padding: 10px 12px; border-radius: 14px; border: none;
-  background: #E8E2D6; cursor: pointer; flex-shrink: 0;
+  padding: 10px 12px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  cursor: pointer; flex-shrink: 0;
   gap: 2px; position: relative;
+  transition: border-color 0.2s ease;
 }
 .dayBtnActive {
-  background: var(--glass-heavy) !important;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  border-bottom: 2px solid var(--ink);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(100, 180, 255, 0.2), transparent 70%),
+    rgba(20, 40, 70, 0.7) !important;
+  border-color: rgba(100, 180, 255, 0.45) !important;
+  box-shadow: 0 4px 16px rgba(60, 140, 255, 0.15);
 }
-.dayName { font-size: 11px; color: #8C857B; text-transform: capitalize; }
+.dayName { font-size: 11px; color: var(--ink-60); text-transform: capitalize; }
 .dayNum { font-size: 17px; font-weight: 700; color: var(--ink); }
 .dayDot {
   width: 5px; height: 5px; border-radius: 50%;
-  background: var(--ink); position: absolute; bottom: 6px;
+  background: rgba(100,180,255,0.8);
+  position: absolute; bottom: 6px;
 }
 
 /* Analytics */
@@ -208,8 +212,8 @@
   box-shadow: var(--shadow-premium);
 }
 .statNumber { font-size: 22px; font-weight: 700; color: var(--ink); }
-.statLabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #8C857B; }
-.statSub { font-size: 11px; color: #8C857B; }
+.statLabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-60); }
+.statSub { font-size: 11px; color: var(--ink-60); }
 .statText { font-size: 15px; font-weight: 600; color: var(--ink-100); }
 .topServiceRow { display: flex; justify-content: space-between; margin-top: 6px; }
 .topServiceName { font-size: 13px; color: var(--ink-100); }
@@ -232,7 +236,8 @@
   box-shadow: 0 -12px 40px rgba(20, 18, 16, 0.15), var(--shadow-premium);
 }
 
-.empty { text-align: center; color: #8C857B; font-size: 14px; padding: 30px 0; }
+.empty { text-align: center; color: var(--ink-60); font-size: 14px; padding: 30px 0; }
+
 .denied { min-height: 100dvh; display: grid; place-items: center; font-size: 16px; color: #8C857B; }
 
 .nextCard { align-items: flex-start; }
@@ -241,7 +246,12 @@
 
 .clientRow { display: flex; align-items: center; gap: 12px; }
 
-.nextHot { background: #FFF8E6 !important; }
+.nextHot {
+  background:
+    radial-gradient(circle at 20% 50%, rgba(255,180,60,0.1), transparent 60%),
+    rgba(30,20,10,0.6) !important;
+  border-color: rgba(255,180,60,0.3) !important;
+}
 
 .swipeHints {
   margin-top: 4px;
@@ -268,10 +278,10 @@
   box-shadow: var(--shadow-premium);
 }
 .barColumn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.barWrapper { height: 80px; width: 20px; border-radius: 999px; background: #F0E8DA; display: flex; align-items: flex-end; padding: 2px; }
-.bar { width: 100%; border-radius: 999px; background: var(--ink); transition: height 0.3s; }
-.barToday { box-shadow: 0 0 0 2px rgba(184,150,62,0.2); }
-.barLabel { font-size: 11px; color: #8C857B; text-transform: capitalize; }
+.barWrapper { height: 80px; width: 20px; border-radius: 999px; background: rgba(255,255,255,0.06); display: flex; align-items: flex-end; padding: 2px; }
+.bar { width: 100%; border-radius: 999px; background: rgba(100,180,255,0.6); transition: height 0.3s; }
+.barToday { background: rgba(140,210,255,0.9) !important; box-shadow: 0 0 12px rgba(100,180,255,0.4); }
+.barLabel { font-size: 11px; color: var(--ink-60); text-transform: capitalize; }
 .barValue { font-size: 11px; color: var(--ink); }
 
 .emptyState {
@@ -281,7 +291,7 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  color: #8C857B;
+  color: var(--ink-60);
 }
 .emptyIcon { font-size: 32px; }
 
@@ -307,7 +317,73 @@
   to { transform: rotate(360deg); }
 }
 
-.master :global(.glass-panel) {
-  background: transparent;
-  backdrop-filter: none;
+/* Chat tab cards */
+.chatCard {
+  background: rgba(255,255,255,0.04);
+  border-radius: 16px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: border-color 0.2s ease;
+}
+.chatCard:active { border-color: rgba(100,180,255,0.3); }
+
+.chatAvatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(100,180,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 18px;
+  flex-shrink: 0;
+  position: relative;
+  color: var(--ink);
+  border: 1px solid rgba(100,180,255,0.2);
+}
+
+.chatBadge {
+  position: absolute; top: -2px; right: -2px;
+  background: rgba(100,180,255,0.9);
+  color: rgba(4,12,28,0.95);
+  border-radius: 50%;
+  width: 18px; height: 18px;
+  font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+}
+
+.chatName { font-weight: 600; margin: 0; font-size: 15px; color: var(--ink); }
+.chatTime { font-size: 11px; color: var(--ink-60); flex-shrink: 0; margin-left: 8px; }
+.chatPreview {
+  color: var(--ink-60); margin: 2px 0 0; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Header action buttons */
+.btnNotify {
+  background: rgba(255,180,60,0.1);
+  border: 1px solid rgba(255,180,60,0.3);
+  border-radius: 10px; padding: 6px 10px;
+  color: rgba(255,200,80,0.9); font-size: 14px; cursor: pointer;
+}
+.btnNotifyActive {
+  background: rgba(52,211,153,0.1);
+  border: none; border-radius: 10px;
+  padding: 6px 10px; color: #34d399;
+  font-size: 14px; cursor: default;
+}
+.btnRefresh {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 6px 10px;
+  color: var(--ink-60); font-size: 16px; cursor: pointer;
+}
+.pendingBadge {
+  background: rgba(239,68,68,0.15); color: rgba(255,120,120,0.9);
+  font-size: 12px; font-weight: 600;
+  padding: 4px 10px; border-radius: 20px;
+  border: 1px solid rgba(239,68,68,0.2);
 }

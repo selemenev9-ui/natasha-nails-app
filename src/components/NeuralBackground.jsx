@@ -12,8 +12,8 @@ export default function NeuralBackground() {
     const FPS = 30;
     const INTERVAL = 1000 / FPS;
 
-    const PARTICLE_COUNT = 45;
-    const MAX_DIST = 140;
+    const PARTICLE_COUNT = 28;
+    const MAX_DIST = 110;
     const particles = [];
 
     function resize() {

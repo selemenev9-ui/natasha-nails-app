@@ -24,6 +24,7 @@ const CATEGORY_TEMPLATE = [
 
 export default function BookingScreen({ onConfirmChange, preSelectedService, onServiceConsumed }) {
   const listRef = useRef(null);
+  const isMountedRef = useRef(true);
   const { triggerHaptic, user } = useVK();
   const [categories, setCategories] = useState(() => CATEGORY_TEMPLATE.map((meta) => ({ ...meta, items: [] })));
   const [activeService, setActiveService] = useState(null);
@@ -36,6 +37,12 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
   const [confirmState, setConfirmState] = useState(null);
   const [selectedDate] = useState(() => new Date().toISOString());
   useViscousScroll(listRef);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     onConfirmChange?.(false);
@@ -335,6 +342,7 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
             });
             if (!response.ok) throw new Error(`Ошибка ${response.status}`);
             triggerHaptic('medium');
+            if (!isMountedRef.current) return;
             setConfirmState({
               service: payload.service,
               date: bookingDate,

@@ -103,7 +103,7 @@ export default function NeuralBackground() {
         inset: 0,
         zIndex: 0,
         pointerEvents: 'none',
-        opacity: 0.65
+        opacity: 0.85
       }}
     />
   );

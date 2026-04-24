@@ -190,11 +190,11 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
   return (
     <>
       <div className={styles.booking}>
-        <NeuralBackground />
         <div className={styles.ambientContainer} aria-hidden="true">
           <div className={styles.auroraMesh} />
           <div className={styles.noiseOverlay} />
         </div>
+        <NeuralBackground />
 
         <div className={styles.contentLayer}>
           <motion.div

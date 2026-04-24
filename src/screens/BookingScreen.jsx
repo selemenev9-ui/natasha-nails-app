@@ -371,31 +371,110 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            transition={{ duration: 0.3 }}
           >
             <ConfirmationParticles />
-            <div className={styles.confirmRing}>
-              <div className={styles.confirmRingTrack} />
-              <div className={styles.confirmRingSpinner} />
-            </div>
-            <h2 className={styles.confirmTitle}>Ритуал забронирован</h2>
-            <div className={styles.confirmDetails}>
-              <p className={styles.confirmService}>{confirmState.service?.title}</p>
-              <div className={styles.confirmMeta}>
-                <span>{formatBookingDate(confirmState.date)}</span>
-                {confirmState.totalPrice ? (
-                  <span>{confirmState.totalPrice.toLocaleString('ru-RU')} ₽</span>
-                ) : null}
-              </div>
-            </div>
-            <div className={styles.confirmActions}>
-              <button type="button" className="btn-ink" onClick={handleConfirmClose}>
+
+            <motion.div
+              className={styles.receiptCard}
+              initial={{ y: 60, opacity: 0, scale: 0.92 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 22, delay: 0.1 }}
+            >
+              {/* Логотип */}
+              <motion.div
+                className={styles.receiptLogo}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+              >
+                <span className={styles.receiptBrand}>NATASHA LAB</span>
+                <span className={styles.receiptTag}>PREMIUM</span>
+              </motion.div>
+
+              {/* Галочка */}
+              <motion.div
+                className={styles.receiptCheckWrap}
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.4 }}
+              >
+                <svg className={styles.receiptCheckSvg} viewBox="0 0 56 56" fill="none">
+                  <circle cx="28" cy="28" r="27" stroke="rgba(100,180,255,0.35)" strokeWidth="1" />
+                  <motion.path
+                    d="M16 28 L24 36 L40 20"
+                    stroke="rgba(140,210,255,0.95)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.5, delay: 0.55, ease: 'easeOut' }}
+                  />
+                </svg>
+              </motion.div>
+
+              {/* Название услуги */}
+              <motion.h2
+                className={styles.receiptService}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.65, duration: 0.35 }}
+              >
+                {confirmState.service?.title}
+              </motion.h2>
+
+              {/* Разделитель */}
+              <motion.div
+                className={styles.receiptDivider}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.75 }}
+              />
+
+              {/* Строки чека */}
+              {[
+                { label: 'Дата', value: formatBookingDate(confirmState.date) },
+                confirmState.totalPrice ? { label: 'Сумма', value: `${confirmState.totalPrice.toLocaleString('ru-RU')} ₽` } : null
+              ].filter(Boolean).map((row, i) => (
+                <motion.div
+                  key={row.label}
+                  className={styles.receiptRow}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.8 + i * 0.1, duration: 0.3 }}
+                >
+                  <span className={styles.receiptRowLabel}>{row.label}</span>
+                  <span className={styles.receiptRowValue}>{row.value}</span>
+                </motion.div>
+              ))}
+
+              {/* Футер */}
+              <motion.p
+                className={styles.receiptFooter}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.05 }}
+              >
+                Мастер свяжется для подтверждения
+              </motion.p>
+            </motion.div>
+
+            {/* Кнопки */}
+            <motion.div
+              className={styles.confirmActions}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.1, duration: 0.35 }}
+            >
+              <button type="button" className={styles.confirmDoneBtn} onClick={handleConfirmClose}>
                 Готово
               </button>
               <button type="button" className={styles.confirmOutline} onClick={handleConfirmClose}>
                 Вернуться к услугам
               </button>
-            </div>
+            </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>

@@ -43,18 +43,31 @@ function MagneticTab({ tab, isActive, onChange }) {
     <div ref={ref} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
       <motion.button
         type="button"
-        whileTap={{ scale: 0.97 }}
+        whileTap={{ scale: 0.88 }}
         className={`${styles.tab} ${isActive ? styles.active : ''}`}
         onClick={() => { haptic.light(); onChange?.(tab.id); }}
       >
         <div className={styles.iconWrap}>
           <Icon active={isActive} />
+          {isActive && (
+            <motion.div
+              layoutId="tab-flash"
+              className={styles.flash}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            />
+          )}
           {tab.unread > 0 && (
             <span className={styles.unreadBadge}>{tab.unread > 99 ? '99+' : tab.unread}</span>
           )}
           {isActive && (
-            <motion.span layoutId="tab-dot" className={styles.dot}
-              transition={{ type: 'spring', stiffness: 400, damping: 28 }} />
+            <motion.span
+              layoutId="tab-dot"
+              className={styles.dot}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+            />
           )}
         </div>
         <span className={styles.label}>{tab.label}</span>

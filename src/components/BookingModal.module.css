@@ -5,125 +5,231 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 24px 20px calc(var(--safe-bottom, 0px) + 24px);
-  background: rgba(2, 2, 6, 0.7);
+  background: rgba(1, 5, 14, 0.75);
   backdrop-filter: blur(20px);
 }
 
 .sheet {
   width: min(520px, 100%);
   border-radius: 32px 32px 24px 24px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-heavy);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  box-shadow: 0 -12px 40px rgba(20, 18, 16, 0.15), var(--shadow-premium);
-  padding: 28px 24px 36px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(circle at 30% 0%, rgba(100, 180, 255, 0.1), transparent 55%),
+    linear-gradient(160deg, rgba(10, 20, 38, 0.97), rgba(4, 8, 18, 0.98));
+  backdrop-filter: blur(40px) saturate(160%);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 -16px 48px rgba(0, 5, 20, 0.6);
+  padding: 20px 20px 32px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   color: var(--ink);
+}
+
+.handle {
+  width: 36px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  margin: 0 auto 4px;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+/* ── Дни ── */
+.daysTrack {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.daysTrack::-webkit-scrollbar { display: none; }
+
+.dayCard {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  padding: 10px 0;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.dayCardActive {
+  border-color: rgba(100, 180, 255, 0.45);
+}
+
+.dayActiveBg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(100, 180, 255, 0.25), transparent 70%),
+    linear-gradient(160deg, rgba(30, 60, 100, 0.7), rgba(10, 24, 50, 0.85));
+  z-index: 0;
+}
+
+.dayName {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-60);
+}
+
+.dayCard.dayCardActive .dayName {
+  color: rgba(140, 200, 255, 0.8);
+}
+
+.dayNum {
+  position: relative;
+  z-index: 1;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.dayMonth {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-60);
+}
+
+/* ── Время ── */
+.section { display: flex; flex-direction: column; gap: 10px; }
+
+.label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-60);
+}
+
+.timeGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+}
+
+.timeSlot {
+  position: relative;
+  padding: 11px 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-60);
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.timeSlot:hover:not(:disabled) {
+  border-color: rgba(100, 180, 255, 0.3);
+  color: var(--ink);
+}
+
+.timeSlotActive {
+  border-color: rgba(100, 180, 255, 0.55) !important;
+  color: rgba(220, 240, 255, 0.95) !important;
+  font-weight: 600;
+}
+
+.timeActiveBg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(100, 180, 255, 0.28), transparent 70%),
+    linear-gradient(160deg, rgba(25, 55, 95, 0.75), rgba(8, 20, 45, 0.85));
+  z-index: 0;
+}
+
+.timeSlot > * { position: relative; z-index: 1; }
+
+.timeSlotBusy {
+  opacity: 0.22;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+/* ── Кнопки ── */
+.confirmBtn {
+  width: 100%;
+  padding: 16px;
+  border-radius: 16px;
+  border: none;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(100, 180, 255, 0.2), transparent 60%),
+    linear-gradient(135deg, rgba(237, 244, 255, 0.95), rgba(200, 225, 255, 0.9));
+  color: rgba(4, 12, 28, 0.95);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow:
+    0 8px 24px rgba(80, 160, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: opacity 0.2s ease;
+}
+
+.confirmBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .closeButton {
   align-self: center;
-  border: 1px solid rgba(28, 27, 26, 0.15);
-  background: var(--glass-border);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
   color: var(--ink-60);
   border-radius: 999px;
-  padding: 10px 26px;
-  font-size: 13px;
-  letter-spacing: 0.12em;
+  padding: 9px 24px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: color 0.2s ease, border-color 0.2s ease;
 }
 
-.closeButton:active {
-  transform: translateY(1px);
-}
-
-.placeholder {
-  border-radius: 20px;
-  border: 1px dashed rgba(255, 255, 255, 0.3);
-  padding: 24px;
-  text-align: center;
-  font-size: 15px;
-  line-height: 1.6;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-60);
-  background: linear-gradient(135deg, rgba(212, 197, 179, 0.35), rgba(247, 245, 240, 0.85));
-}
-
-.handle {
-  width: 40px; height: 4px; border-radius: 2px;
-  background: rgba(255,255,255,0.2);
-  margin: 0 auto 16px;
-}
-.title {
-  font-size: 18px; font-weight: 700;
-  color: var(--ink-100); margin: 0 0 20px;
-  text-align: center;
-}
-.section { margin-bottom: 20px; }
-.label {
-  font-size: 11px; text-transform: uppercase;
-  letter-spacing: 0.15em; color: var(--ink-60);
-  margin-bottom: 10px;
-}
-.dateInput {
-  width: 100%; padding: 12px; border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-light);
-  color: var(--ink-100); font-size: 15px;
-  box-sizing: border-box;
-}
-.timeGrid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-}
-.timeSlot {
-  padding: 10px 4px; border-radius: 10px;
-  background: var(--glass-light);
-  border: 1px solid var(--glass-border);
-  color: var(--ink-60); font-size: 13px;
-  cursor: pointer; transition: all 0.15s;
-}
-.timeSlotActive {
-  background: var(--ink) !important;
-  color: var(--cream) !important; font-weight: 600;
-  border-color: var(--ink) !important;
-  box-shadow: 0 6px 16px rgba(20, 18, 16, 0.2);
-}
-.timeSlotBusy {
-  opacity: 0.25;
-  cursor: not-allowed;
-  text-decoration: line-through;
-}
-.confirmBtn {
-  width: 100%; padding: 16px; border-radius: 14px; border: none;
-  background: var(--ink);
-  color: var(--cream);
-  box-shadow: 0 8px 24px rgba(20, 18, 16, 0.25);
-  font-size: 15px; font-weight: 700;
-  cursor: pointer; margin-bottom: 10px;
-  opacity: 1; transition: opacity 0.2s;
-}
-.confirmBtn:disabled { opacity: 0.4; cursor: default; }
+.closeButton:active { transform: translateY(1px); }
 
 .loadingText {
   text-align: center;
   color: var(--ink-60);
-  font-size: 14px;
-  padding: 10px 0;
+  font-size: 13px;
+  padding: 8px 0;
 }
 
 .dayOffMsg {
   text-align: center;
-  padding: 20px;
+  padding: 18px;
   border-radius: 14px;
-  background: rgba(239,68,68,0.08);
-  color: #ef4444;
-  font-size: 15px;
-  font-weight: 600;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: rgba(255, 120, 120, 0.9);
+  font-size: 14px;
 }

@@ -1335,6 +1335,24 @@ export default function MasterScreen() {
 
   const enableMasterNotifications = useCallback(async () => {
     if (notifyEnabled) return;
+
+    // Администраторы группы не нуждаются в VKWebAppAllowMessagesFromGroup
+    // — у них разрешение уже есть по умолчанию
+    if (isMaster(user?.id)) {
+      try {
+        await bridge.send('VKWebAppStorageSet', {
+          key: 'master_notify_allowed',
+          value: '1'
+        }).catch(() => {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('master_notify_allowed', '1');
+          }
+        });
+      } catch (e) {}
+      setNotifyEnabled(true);
+      return;
+    }
+
     try {
       const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
         group_id: 237746914,
@@ -1354,7 +1372,7 @@ export default function MasterScreen() {
     } catch (e) {
       console.log('Notify result error:', e);
     }
-  }, [notifyEnabled]);
+  }, [notifyEnabled, user?.id]);
 
   const sendHaptic = (type) => {
     try {

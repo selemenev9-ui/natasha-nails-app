@@ -22,7 +22,7 @@ const CATEGORY_TEMPLATE = [
   { id: 'extra', title: 'Дополнительно' }
 ];
 
-export default function BookingScreen({ onConfirmChange, preSelectedService, onServiceConsumed }) {
+export default function BookingScreen({ onNavigate, onConfirmChange, preSelectedService, onServiceConsumed }) {
   const listRef = useRef(null);
   const isMountedRef = useRef(true);
   const { triggerHaptic, user } = useVK();
@@ -165,6 +165,7 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
     setActiveService(null);
     setIsBookingOpen(false);
     onConfirmChange?.(false);
+    onNavigate?.('profile');
   };
 
   const formatBookingDate = (value) => {

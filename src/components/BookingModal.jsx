@@ -75,7 +75,7 @@ export default function BookingModal({ isOpen, onClose, onConfirm }) {
     <AnimatePresence>
       {isOpen && (
         <motion.div className={styles.overlay}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0 } }}
           onClick={onClose}>
           <motion.div className={styles.sheet}
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}

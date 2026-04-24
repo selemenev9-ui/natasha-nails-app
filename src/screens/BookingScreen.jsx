@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import ServiceConstructor from '../components/ServiceConstructor.jsx';
 import BookingModal from '../components/BookingModal.jsx';
 import ConfirmationParticles from '../components/ConfirmationParticles.jsx';
-import NeuralBackground from '../components/NeuralBackground.jsx';
 import useViscousScroll from '../hooks/useViscousScroll.js';
 import { useVK } from '../contexts/VKContext.jsx';
 import { NAIL_MODIFIERS } from '../data/services.js';
@@ -194,7 +193,6 @@ export default function BookingScreen({ onConfirmChange, preSelectedService, onS
           <div className={styles.auroraMesh} />
           <div className={styles.noiseOverlay} />
         </div>
-        <NeuralBackground />
 
         <div className={styles.contentLayer}>
           <motion.div

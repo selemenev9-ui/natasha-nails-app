@@ -10,6 +10,7 @@ import ChatScreen from './screens/ChatScreen.jsx';
 import MasterScreen from './screens/MasterScreen.jsx';
 import OnboardingScreen from './screens/OnboardingScreen.jsx';
 import TabBar from './components/TabBar.jsx';
+import NeuralBackground from './components/NeuralBackground.jsx';
 import { useVK } from './contexts/VKContext.jsx';
 
 /**
@@ -268,6 +269,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="material" />
+      <NeuralBackground />
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen}

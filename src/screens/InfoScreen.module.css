@@ -1,6 +1,6 @@
 .info {
   min-height: 100dvh;
-  background: var(--cream);
+  background: transparent;
   color: var(--ink);
 }
 

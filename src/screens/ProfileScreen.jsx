@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import BeautyCard from '../components/BeautyCard.jsx';
 import CareAccordion from '../components/CareAccordion.jsx';
@@ -196,15 +196,8 @@ export default function ProfileScreen({ onNavigate }) {
 
   return (
     <div className={styles.profile}>
-      <motion.div
-        className={styles.ambientGlow}
-        animate={{
-          background:
-            'radial-gradient(circle at 30% 20%, rgba(212, 197, 179, 0.45), transparent 60%), radial-gradient(circle at 70% 80%, rgba(240, 235, 225, 0.5), transparent 65%), #F7F5F0'
-        }}
-        transition={{ duration: 0.8, ease: 'easeInOut' }}
-      />
       <div className={styles.inner}>
+
         <header className={styles.header}>
           <h1 className={styles.title}>Рады видеть тебя, {firstName}</h1>
           {avatar

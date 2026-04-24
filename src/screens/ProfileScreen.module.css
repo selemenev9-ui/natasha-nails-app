@@ -3,18 +3,7 @@
   min-height: 100dvh;
   padding: calc(var(--safe-top) + 32px) 24px calc(var(--safe-bottom) + var(--tabbar-space));
   overflow-x: hidden;
-  background: radial-gradient(circle at 15% 10%, rgba(232, 217, 196, 0.35), transparent 55%), var(--cream);
-}
-
-.ambientGlow {
-  position: absolute;
-  width: 200%;
-  height: 200%;
-  top: -50%;
-  left: -50%;
-  pointer-events: none;
-  z-index: 0;
-  filter: blur(95px);
+  background: transparent;
 }
 
 .inner {
@@ -209,8 +198,8 @@
 }
 
 .rescheduleBtn {
-  background: #FFF9F0;
-  color: #B8963E;
+  background: rgba(232, 196, 106, 0.15);
+  color: #E8C46A;
 }
 
 .cancelBtn {
@@ -273,8 +262,8 @@
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 600;
-  color: #B8963E;
-  background: rgba(184,150,62,0.12);
+  color: #E8C46A;
+  background: rgba(232, 196, 106, 0.12);
   cursor: pointer;
 }
 

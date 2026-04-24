@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import bridge from '@vkontakte/vk-bridge';
 import { AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import BeautyCard from '../components/BeautyCard.jsx';
-import CareAccordion from '../components/CareAccordion.jsx';
-import { getDailyTips } from '../data/careHub';
 import { API_URL } from '../utils/config.js';
 import ChatDrawer from '../components/ChatDrawer.jsx';
 
@@ -177,27 +174,17 @@ function HistorySection({ clientId, onNavigate, onChatRequest }) {
 }
 
 export default function ProfileScreen({ onNavigate }) {
-  const { user, cardTheme, toggleTheme, seenTips, isBridgeLoading, isVKEnv } = useVK();
+  const { user } = useVK();
   const firstName = user?.first_name || 'гость';
   const avatar = user?.photo_200 || '';
-  const [dailyMix, setDailyMix] = useState([]);
   const [chatAppt, setChatAppt] = useState(null);
-
-  useEffect(() => {
-    if (isBridgeLoading) return;
-    const { tips, newSeenIds } = getDailyTips(3, seenTips);
-    setDailyMix(tips);
-    if (newSeenIds.length > seenTips.length && isVKEnv) {
-      bridge.send('VKWebAppStorageSet', { key: 'seen_tips', value: JSON.stringify(newSeenIds) }).catch(() => {});
-    }
-  }, [isBridgeLoading, isVKEnv, seenTips]);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const openAdmin = () => window.open('https://vk.me/natasha_premium_lab', '_blank');
 
   return (
     <div className={styles.profile}>
       <div className={styles.inner}>
-
         <header className={styles.header}>
           <h1 className={styles.title}>Рады видеть тебя, {firstName}</h1>
           {avatar
@@ -205,34 +192,33 @@ export default function ProfileScreen({ onNavigate }) {
             : <div className={styles.avatarPlaceholder} aria-hidden="true" />}
         </header>
 
-        {/* История визитов */}
-        <section className={styles.beautyIdSection}>
-          <p className={styles.sectionLabel}>Мои визиты</p>
-          <HistorySection
-            clientId={user?.id ? String(user.id) : null}
-            onNavigate={onNavigate}
-            onChatRequest={setChatAppt}
-          />
-
-        </section>
-
-        {/* Beauty ID */}
         <section className={styles.beautyIdSection}>
           <p className={styles.sectionLabel}>Beauty ID</p>
-          <button className={`${styles.themeToggle} glass-panel`} onClick={toggleTheme} type="button">
-            {cardTheme === 'dark' ? '☀️ Светлый дизайн' : '🌙 Тёмный дизайн'}
+          <div className={styles.beautyIdContainer}>
+            <BeautyCard firstName={user?.first_name} vkId={user?.id} theme="dark" />
+          </div>
+        </section>
+
+        <section className={styles.beautyIdSection}>
+          <button
+            className={styles.historyToggle}
+            type="button"
+            onClick={() => setHistoryOpen((o) => !o)}
+          >
+            <p className={styles.sectionLabel} style={{ margin: 0 }}>Мои визиты</p>
+            <span className={styles.historyArrow}>{historyOpen ? '▲' : '▼'}</span>
           </button>
-          <div className={`${styles.beautyIdContainer} glass-panel`}>
-            <BeautyCard firstName={user?.first_name} vkId={user?.id} theme={cardTheme} />
-          </div>
-          <div className={`${styles.careLibrary} glass-panel`}>
-            <h2 className={styles.careTitle}>Beauty Mix на сегодня</h2>
-            <CareAccordion data={dailyMix} />
-          </div>
+          {historyOpen && (
+            <HistorySection
+              clientId={user?.id ? String(user.id) : null}
+              onNavigate={onNavigate}
+              onChatRequest={setChatAppt}
+            />
+          )}
         </section>
 
         <footer className={styles.footer}>
-          <button className="btn-ink" onClick={openAdmin}>Написать администратору</button>
+          <button className={styles.ctaButton} onClick={openAdmin}>Написать администратору</button>
         </footer>
       </div>
       <AnimatePresence>

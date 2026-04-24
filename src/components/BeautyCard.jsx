@@ -157,7 +157,7 @@ export default function BeautyCard({ firstName, vkId, theme = 'light' }) {
     const percentX = clamp(((rotateY + MAX_TILT) / (2 * MAX_TILT)) * 100, 0, 100);
     const percentY = clamp(((-rotateX + MAX_TILT) / (2 * MAX_TILT)) * 100, 0, 100);
     const intensity = Math.min(1, (Math.abs(rotateX) + Math.abs(rotateY)) / (MAX_TILT * 1.2));
-    const glareColor = theme === 'dark' ? 'rgba(214, 214, 214, 0.24)' : 'rgba(255, 255, 255, 0.35)';
+    const glareColor = theme === 'dark' ? 'rgba(100, 180, 255, 0.22)' : 'rgba(255, 255, 255, 0.35)';
 
     return {
       background: `radial-gradient(circle at ${percentX}% ${percentY}%, ${glareColor} 0%, rgba(255, 255, 255, 0) 60%)`,
@@ -168,7 +168,7 @@ export default function BeautyCard({ firstName, vkId, theme = 'light' }) {
   const rimStyle = useMemo(() => {
     const offsetX = clamp((-rotateY / MAX_TILT) * 16, -16, 16);
     const offsetY = clamp((rotateX / MAX_TILT) * 16, -16, 16);
-    const rimColor = theme === 'dark' ? 'rgba(255, 220, 168, 0.32)' : 'rgba(255, 255, 255, 0.42)';
+    const rimColor = theme === 'dark' ? 'rgba(140, 200, 255, 0.25)' : 'rgba(255, 255, 255, 0.42)';
 
     return {
       boxShadow: `inset ${offsetX}px ${offsetY}px 24px ${rimColor}`

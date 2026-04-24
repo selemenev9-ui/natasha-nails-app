@@ -13,6 +13,7 @@ export default function ConfirmationParticles() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
     renderer.setClearColor(0x000000, 0);
+    renderer.domElement.style.pointerEvents = 'none';
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();

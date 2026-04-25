@@ -34,78 +34,6 @@ const pageVariants = {
   }
 };
 
-function NotifyPermissionModal({ onAllow, onSkip }) {
-  return (
-    <motion.div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 300,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'flex-end'
-      }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        style={{
-          width: '100%',
-          background: 'var(--cream)',
-          borderRadius: '20px 20px 0 0',
-          padding: '24px 20px 36px'
-        }}
-        initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      >
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🔔</div>
-          <p style={{ fontWeight: 700, fontSize: 18, margin: '0 0 8px' }}>
-            Уведомления о записях
-          </p>
-          <p style={{ color: '#888', fontSize: 14, lineHeight: 1.5, margin: 0 }}>
-            Получайте напоминания о предстоящих визитах и статусе ваших записей
-          </p>
-        </div>
-        <button
-          onClick={onAllow}
-          style={{
-            width: '100%',
-            padding: '14px',
-            background: 'var(--ink)',
-            color: 'var(--cream)',
-            border: 'none',
-            borderRadius: 14,
-            fontSize: 16,
-            fontWeight: 600,
-            cursor: 'pointer',
-            marginBottom: 10
-          }}
-        >
-          Включить уведомления
-        </button>
-        <button
-          onClick={onSkip}
-          style={{
-            width: '100%',
-            padding: '12px',
-            background: 'none',
-            color: '#aaa',
-            border: 'none',
-            fontSize: 14,
-            cursor: 'pointer'
-          }}
-        >
-          Пропустить
-        </button>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 function SplashScreen() {
   return (
     <motion.div
@@ -142,13 +70,12 @@ function SplashScreen() {
 }
 
 export default function App() {
-  const { isBridgeLoading, isFirstVisit, completeOnboarding } = useVK();
+  const { isBridgeLoading, isFirstVisit, isVKEnv, completeOnboarding } = useVK();
   const [route, setRoute] = useState('profile');
   const [isConfirm, setIsConfirm] = useState(false);
   const [isSplashVisible, setIsSplashVisible] = useState(true);
   const [preSelectedService, setPreSelectedService] = useState(null);
   const [chatUnread, setChatUnread] = useState(0);
-  const [showNotifyModal, setShowNotifyModal] = useState(false);
   const currentScreen = route;
 
   const navigate = (next, params = {}) => {
@@ -195,67 +122,37 @@ export default function App() {
   }, [isBridgeLoading, isFirstVisit]);
 
   useEffect(() => {
-    if (isBridgeLoading || isFirstVisit) return;
-    let timeoutId;
+    if (isBridgeLoading || isFirstVisit || !isVKEnv) return;
 
-    const scheduleModal = () => {
-      timeoutId = setTimeout(() => setShowNotifyModal(true), 1500);
-    };
+    const timeoutId = setTimeout(() => {
+      bridge
+        .send('VKWebAppStorageGet', { keys: ['notify_allowed'] })
+        .then((data) => {
+          const val = data?.keys?.find((k) => k.key === 'notify_allowed')?.value;
+          const isAllowed = val === '1';
+          const isSkipped = val?.startsWith('skip_') && Date.now() < Number(val.split('_')[1]);
+          if (isAllowed || isSkipped) return;
 
-    bridge
-      .send('VKWebAppStorageGet', { keys: ['notify_allowed'] })
-      .then((data) => {
-        const val = data?.keys?.find((k) => k.key === 'notify_allowed')?.value;
-        if (!val) {
-          scheduleModal();
-        }
-      })
-      .catch(() => {
-        if (typeof window !== 'undefined' && !localStorage.getItem('notify_allowed')) {
-          scheduleModal();
-        }
-      });
+          bridge
+            .send('VKWebAppAllowMessagesFromGroup', {
+              group_id: 237746914,
+              key: 'notify_booking'
+            })
+            .then((result) => {
+              if (result?.result) {
+                bridge.send('VKWebAppStorageSet', { key: 'notify_allowed', value: '1' }).catch(() => {});
+              }
+            })
+            .catch(() => {
+              const skipVal = 'skip_' + String(Date.now() + 3 * 24 * 60 * 60 * 1000);
+              bridge.send('VKWebAppStorageSet', { key: 'notify_allowed', value: skipVal }).catch(() => {});
+            });
+        })
+        .catch(() => {});
+    }, 1500);
 
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [isBridgeLoading, isFirstVisit]);
-
-  const handleAllowNotify = async () => {
-    setShowNotifyModal(false);
-    try {
-      const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
-        group_id: 237746914,
-        key: 'notify_booking'
-      });
-      if (result?.result) {
-        await bridge.send('VKWebAppStorageSet', {
-          key: 'notify_allowed',
-          value: '1'
-        }).catch(() => {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('notify_allowed', '1');
-          }
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  const handleSkipNotify = async () => {
-    setShowNotifyModal(false);
-    try {
-      await bridge.send('VKWebAppStorageSet', {
-        key: 'notify_allowed',
-        value: 'skipped'
-      });
-    } catch (e) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('notify_allowed', 'skipped');
-      }
-    }
-  };
+    return () => clearTimeout(timeoutId);
+  }, [isBridgeLoading, isFirstVisit, isVKEnv]);
 
   if (isFirstVisit) {
     return (
@@ -297,12 +194,6 @@ export default function App() {
       <TabBar active={route} onChange={navigate} isHidden={isConfirm} chatUnread={chatUnread} />
 
       <AnimatePresence>{showSplash && <SplashScreen key="splash" />}</AnimatePresence>
-
-      <AnimatePresence>
-        {showNotifyModal && !isBridgeLoading && (
-          <NotifyPermissionModal onAllow={handleAllowNotify} onSkip={handleSkipNotify} />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

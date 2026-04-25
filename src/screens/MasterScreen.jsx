@@ -1374,6 +1374,21 @@ export default function MasterScreen() {
     }
   }, [notifyEnabled, user?.id]);
 
+  const refreshClientNotifyPermission = useCallback(async () => {
+    try {
+      await bridge.send('VKWebAppStorageSet', { key: 'notify_allowed', value: '' }).catch(() => {});
+      const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
+        group_id: 237746914,
+        key: 'notify_booking'
+      });
+      if (result?.result) {
+        await bridge.send('VKWebAppStorageSet', { key: 'notify_allowed', value: '1' }).catch(() => {});
+      }
+    } catch (error) {
+      console.error('Refresh notify permission failed:', error);
+    }
+  }, []);
+
   const sendHaptic = (type) => {
     try {
       bridge.send('VKWebAppTapticNotificationOccurred', { type });
@@ -1490,6 +1505,9 @@ export default function MasterScreen() {
               {pendingCount > 0 && (
                 <span className={styles.pendingBadge}>{pendingCount} новых</span>
               )}
+              <button className={styles.btnNotify} onClick={refreshClientNotifyPermission}>
+                🔔 Обновить разрешение уведомлений
+              </button>
               {notifyEnabled ? (
                 <button className={styles.btnNotifyActive} disabled>
                   ✅ Уведомления включены

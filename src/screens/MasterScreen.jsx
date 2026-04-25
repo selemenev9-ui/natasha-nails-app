@@ -639,6 +639,7 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [loadingNotes, setLoadingNotes] = useState(false);
+  const [clientProfile, setClientProfile] = useState(null);
   const clientModalRef = useRef(false);
 
   useEffect(() => {
@@ -685,11 +686,20 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
     if (!selectedClient) onModalOpen?.();
     setSelectedClient(c);
     setLoadingNotes(true);
+    setClientProfile(null);
     try {
-      const res = await fetch(`${API_URL}?action=client_notes&client_id=${c.id}`);
-      const data = await res.json();
-      setNotes(data.notes || '');
-    } catch(e) { setNotes(''); }
+      const [notesRes, profileRes] = await Promise.all([
+        fetch(`${API_URL}?action=client_notes&client_id=${c.id}`).then((r) => r.json()),
+        fetch(`${API_URL}?action=get_client_profile&client_id=${c.id}`)
+          .then((r) => r.json())
+          .catch(() => ({ profile: null }))
+      ]);
+      setNotes(notesRes.notes || '');
+      setClientProfile(profileRes.profile || null);
+    } catch (e) {
+      setNotes('');
+      setClientProfile(null);
+    }
     setLoadingNotes(false);
   };
 
@@ -782,6 +792,24 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
 
               <p className={styles.cardTitle}>{selectedClient.name}</p>
               {selectedClient.phone && <p className={styles.cardSub}>📞 {selectedClient.phone}</p>}
+              {clientProfile && (
+                <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {clientProfile.phone && (
+                    <p className={styles.cardSub}>📞 {clientProfile.phone}</p>
+                  )}
+                  {clientProfile.telegram && (
+                    <a
+                      href={`https://t.me/${clientProfile.telegram.replace('@', '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={styles.cardSub}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      ✈️ {clientProfile.telegram}
+                    </a>
+                  )}
+                </div>
+              )}
               <div className={styles.analyticsGrid} style={{ gridTemplateColumns: '1fr 1fr' }}>
                 <div className={`${styles.analyticsCard} glass-panel`}>
                   <span className={styles.statLabel}>Визитов</span>

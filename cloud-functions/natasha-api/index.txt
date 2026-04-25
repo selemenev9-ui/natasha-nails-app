@@ -1,0 +1,920 @@
+import ydb from 'ydb-sdk';
+import crypto from 'crypto';
+import https from 'https';
+const { Driver, getCredentialsFromEnv } = ydb;
+
+// ─── S3 / Object Storage ──────────────────────────────────────────────────
+const S3_BUCKET = 'natasha-chat-media';
+const S3_REGION = 'ru-central1';
+const S3_ENDPOINT = 'storage.yandexcloud.net';
+
+function s3Hmac(key, data, enc) {
+  return crypto.createHmac('sha256', key).update(data).digest(enc || undefined);
+}
+
+async function uploadToS3(buffer, key, contentType) {
+  const keyId = process.env.S3_KEY_ID;
+  const secret = process.env.S3_SECRET;
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const amzDate = now.toISOString().replace(/[:\-]/g, '').replace(/\.\d+/, '');
+  const host = `${S3_BUCKET}.${S3_ENDPOINT}`;
+  const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
+  const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${contentHash}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
+  const canonicalRequest = ['PUT', `/${key}`, '', canonicalHeaders, signedHeaders, contentHash].join('\n');
+  const credentialScope = `${dateStr}/${S3_REGION}/s3/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, crypto.createHash('sha256').update(canonicalRequest).digest('hex')].join('\n');
+  const signingKey = s3Hmac(s3Hmac(s3Hmac(s3Hmac(`AWS4${secret}`, dateStr), S3_REGION), 's3'), 'aws4_request');
+  const signature = s3Hmac(signingKey, stringToSign, 'hex');
+  const authorization = `AWS4-HMAC-SHA256 Credential=${keyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: host, path: `/${key}`, method: 'PUT',
+      headers: {
+        'Content-Type': contentType, 'Content-Length': buffer.length,
+        'x-amz-content-sha256': contentHash, 'x-amz-date': amzDate,
+        'Authorization': authorization
+      }
+    }, (res) => {
+      let body = '';
+      res.on('data', d => body += d);
+      res.on('end', () => res.statusCode === 200
+        ? resolve(`https://${host}/${key}`)
+        : reject(new Error(`S3 ${res.statusCode}: ${body}`))
+      );
+    });
+    req.on('error', reject);
+    req.write(buffer);
+    req.end();
+  });
+}
+
+const endpoint  = process.env.YDB_ENDPOINT;
+const database  = process.env.YDB_DATABASE;
+const VK_TOKEN  = process.env.VK_TOKEN;
+const MASTER_IDS = ['80557585', '187729875']; // без тестового 123456789
+
+const HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
+
+// ── extractValue ──────────────────────────────────────────────
+function extractValue(cell) {
+  if (cell === null || cell === undefined) return null;
+  if (typeof cell !== 'object') return cell;
+  const plain = JSON.parse(JSON.stringify(cell));
+  if (typeof plain !== 'object' || plain === null) return plain;
+  if (typeof plain.low === 'number' && typeof plain.high === 'number') {
+    return plain.high === 0 ? plain.low : plain.low + plain.high * 4294967296;
+  }
+  if ('textValue'     in plain) return String(plain.textValue);
+  if ('bytesValue'    in plain) return String(plain.bytesValue);
+  if ('int32Value'    in plain) return Number(plain.int32Value);
+  if ('uint32Value'   in plain) return Number(plain.uint32Value);
+  if ('int64Value'    in plain) return Number(plain.int64Value);
+  if ('uint64Value'   in plain) return Number(plain.uint64Value);
+  if ('floatValue'    in plain) return Number(plain.floatValue);
+  if ('doubleValue'   in plain) return Number(plain.doubleValue);
+  if ('boolValue'     in plain) return Boolean(plain.boolValue);
+  if ('nullFlagValue' in plain) return null;
+  return null;
+}
+
+function parseResultSet(resultSet) {
+  if (!resultSet?.rows || !resultSet?.columns) return [];
+  const cols = resultSet.columns.map((c) => c.name);
+  return resultSet.rows.map((row) => {
+    const obj = {};
+    (row.items || []).forEach((cell, i) => { obj[cols[i]] = extractValue(cell); });
+    return obj;
+  });
+}
+
+function formatDuration(minutes) {
+  if (!minutes || minutes <= 0) return '';
+  if (minutes < 60) return `${minutes} мин`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h} ч ${m} мин` : `${h} ч`;
+}
+
+function formatService(raw) {
+  const priceNum = Number(raw.price) || 0;
+  const durMin   = Number(raw.duration_minutes) || 0;
+  return {
+    id:              raw.id,
+    category:        raw.category || 'nails',
+    title:           raw.title,
+    price:           priceNum > 0 ? priceNum.toLocaleString('ru-RU') + ' ₽' : 'По запросу',
+    duration:        formatDuration(durMin),
+    basePrice:       priceNum,
+    durationMinutes: durMin,
+    isActive:        raw.is_active !== false,
+    hasModifiers:    raw.category === 'nails'
+  };
+}
+
+const safe = (s) => String(s || '').replace(/["'\\]/g, '');
+
+let _driver = null;
+
+async function getDriver() {
+  if (_driver) {
+    try {
+      if (await _driver.ready(2000)) return _driver;
+    } catch {
+    }
+    if (typeof _driver.destroy === 'function') {
+      await _driver.destroy().catch(() => {});
+    }
+    _driver = null;
+  }
+
+  const driver = new Driver({ endpoint, database, authService: getCredentialsFromEnv() });
+  try {
+    if (!(await driver.ready(15000))) throw new Error('YDB не ответил');
+    _driver = driver;
+    return _driver;
+  } catch (err) {
+    if (typeof driver.destroy === 'function') {
+      await driver.destroy().catch(() => {});
+    }
+    if (_driver === driver) _driver = null;
+    throw err;
+  }
+}
+
+// ── VK уведомления ────────────────────────────────────────────
+async function sendVkMessage(userId, message) {
+  if (!VK_TOKEN || !userId || userId === 'manual') return;
+
+  const randomId = Math.floor(Math.random() * 1e9);
+  const params = new URLSearchParams({
+    user_id:      String(userId),
+    message,
+    random_id:    String(randomId),
+    access_token: VK_TOKEN,
+    v:            '5.131'
+  });
+  try {
+    const res  = await fetch(`https://api.vk.com/method/messages.send?${params}`);
+    const data = await res.json();
+    if (data.error) console.error('VK error:', JSON.stringify(data.error));
+  } catch (e) {
+    console.error('VK fetch failed:', e.message);
+  }
+}
+
+async function notifyMasters(message) {
+  await Promise.allSettled(MASTER_IDS.map(id => sendVkMessage(id, message)));
+}
+
+function formatDateRu(timestamp) {
+  if (!timestamp) return '—';
+  const ms = timestamp > 1e10 ? timestamp : timestamp * 1000;
+  const d  = new Date(ms);
+  const months = ['января','февраля','марта','апреля','мая','июня',
+                  'июля','августа','сентября','октября','ноября','декабря'];
+  const hh = String(d.getUTCHours()).padStart(2,'0');
+  const mm = String(d.getUTCMinutes()).padStart(2,'0');
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} в ${hh}:${mm}`;
+}
+
+// ── Handler ───────────────────────────────────────────────────
+export const handler = (async (event) => {
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: HEADERS, body: '' };
+
+  // ── Таймер-триггер (нет httpMethod) ──────────────────────────
+  if (!event.httpMethod) {
+    const timerAction = event.action
+      ?? (event.body ? (() => { try { return JSON.parse(event.body).action; } catch { return null; } })() : null);
+
+    if (timerAction === 'send_reminders') {
+      const driver = await getDriver();
+      const now = new Date();
+      const tomorrowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+      const tomorrowEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 2, 0, 0, 0));
+      const tsStart = Math.floor(tomorrowStart.getTime() / 1000);
+      const tsEnd   = Math.floor(tomorrowEnd.getTime() / 1000);
+
+      const rows = await driver.tableClient.withSession(async (session) => {
+        const { resultSets } = await session.executeQuery(
+          `SELECT a.id AS id, a.client_id AS client_id, a.client_name AS client_name, a.appointment_date AS appointment_date, a.status AS status, s.title AS service_title
+           FROM appointments AS a
+           LEFT JOIN services AS s ON a.service_id = s.id
+           WHERE a.status = "confirmed" OR a.status = "pending"
+           ORDER BY a.appointment_date`
+        );
+        return parseResultSet(resultSets[0]);
+      });
+
+      const filtered = rows.filter(r => {
+        const ts = Number(r.appointment_date);
+        return ts >= tsStart && ts < tsEnd;
+      });
+
+      console.log('[TIMER] range:', tsStart, '->', tsEnd);
+      console.log('[TIMER] rows before filter:', rows.length);
+      rows.forEach(r => console.log('[TIMER] row:', r.client_id, r.appointment_date, r.status));
+
+      const results = [];
+      for (const row of filtered) {
+        if (!row.client_id || row.client_id === 'manual') continue;
+        const ms = row.appointment_date > 1e10 ? row.appointment_date : row.appointment_date * 1000;
+        const d  = new Date(ms);
+        const timeStr = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+        const message =
+          `💅 Напоминание от Natasha Premium Lab\n\n` +
+          `Завтра вас ждёт: ${row.service_title || 'процедура'}\n` +
+          `🕐 Время: ${timeStr}\n\n` +
+          `Ждём вас! Если нужно перенести — напишите нам 🤍`;
+        await sendVkMessage(row.client_id, message);
+        results.push({ client_id: row.client_id, name: row.client_name, time: timeStr });
+      }
+
+      return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, sent: results.length, results }) };
+    }
+  }
+
+  if (event.httpMethod === 'POST' && event.body) {
+    let _earlyBody;
+    try { _earlyBody = JSON.parse(event.body); } catch { _earlyBody = {}; }
+    if (_earlyBody.action === 'upload_photo') {
+      const { image_base64, content_type, appointment_id } = _earlyBody;
+      if (!image_base64 || !appointment_id) {
+        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны image_base64, appointment_id' }) };
+      }
+      try {
+        const buf = Buffer.from(image_base64, 'base64');
+        const ext = (content_type || 'image/jpeg').split('/')[1] || 'jpg';
+        const objKey = `chat/${safe(appointment_id)}/${Date.now()}.${ext}`;
+        const url = await uploadToS3(buf, objKey, content_type || 'image/jpeg');
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, url }) };
+      } catch (s3err) {
+        console.error('S3 upload error:', s3err.message);
+        return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: s3err.message }) };
+      }
+    }
+  }
+
+  try {
+    const driver = await getDriver();
+    const params = event.queryStringParameters || {};
+
+    // ════════════════════════════════════════
+    // GET
+    // ════════════════════════════════════════
+    if (event.httpMethod === 'GET' || !event.httpMethod) {
+
+      if (params.action === 'history' && params.client_id) {
+        const clientId = safe(params.client_id);
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT a.id AS id, a.service_id AS service_id, a.appointment_date AS appointment_date,
+             a.status AS status, a.total_price AS total_price, s.title AS title
+             FROM appointments AS a
+             LEFT JOIN services AS s ON a.service_id = s.id
+             WHERE a.client_id = "${clientId}"
+             ORDER BY a.appointment_date DESC;`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ appointments: rows }) };
+      }
+
+      if (params.action === 'all_appointments') {
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT a.id AS id, a.client_id AS client_id, a.service_id AS service_id,
+             a.appointment_date AS appointment_date, a.status AS status,
+             a.total_price AS total_price, a.client_name AS client_name,
+             a.client_phone AS client_phone, a.notes AS notes,
+             a.confirmed_at AS confirmed_at, s.title AS title
+             FROM appointments AS a
+             LEFT JOIN services AS s ON a.service_id = s.id
+             ORDER BY a.appointment_date DESC;`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ appointments: rows }) };
+      }
+
+      if (params.action === 'all_services') {
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            'SELECT id, category, title, price, duration_minutes, is_active FROM services;'
+          );
+          return parseResultSet(resultSets[0]);
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ services: rows.map(formatService) }) };
+      }
+
+      if (params.action === 'availability') {
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            'SELECT id, date, start_time, end_time, is_day_off FROM availability;'
+          );
+          return parseResultSet(resultSets[0]);
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ availability: rows }) };
+      }
+
+      if (params.action === 'all_clients') {
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT a.client_id AS client_id,
+             a.client_name AS client_name,
+             a.client_phone AS client_phone,
+             COUNT(a.id) AS visit_count,
+             MAX(a.appointment_date) AS last_visit,
+             COALESCE(SUM(a.total_price), 0) AS total_spent
+             FROM appointments AS a
+             GROUP BY a.client_id, a.client_name, a.client_phone
+             ORDER BY last_visit DESC;`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+        const clients = rows.map((client) => {
+          const totalSpent = Number(client.total_spent) || 0;
+          const visitCount = Number(client.visit_count) || 0;
+          const tags = [];
+          if (totalSpent > 10000) tags.push('VIP');
+          if (visitCount >= 3) tags.push('Постоянный');
+          if (visitCount < 2) tags.push('Новый');
+          return { ...client, total_spent: totalSpent, visit_count: visitCount, tags };
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ clients }) };
+      }
+
+      if (params.action === 'client_notes' && params.client_id) {
+        const clientId = safe(params.client_id);
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT client_notes FROM appointments 
+             WHERE client_id = "${clientId}" AND client_notes IS NOT NULL
+             LIMIT 1;`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+        const notes = rows[0]?.client_notes || '';
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ notes }) };
+      }
+
+      if (params.action === 'get_client_profile') {
+        const clientId = safe(params.client_id);
+        if (!clientId) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'no client_id' }) };
+        }
+
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT phone, telegram FROM client_profiles WHERE client_id = "${clientId}";`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+
+        if (!rows.length) {
+          return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ profile: null }) };
+        }
+
+        const profile = {
+          phone: rows[0]?.phone || '',
+          telegram: rows[0]?.telegram || ''
+        };
+
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ profile }) };
+      }
+
+      if (params.action === 'day_config' && params.date) {
+        const dateStr = safe(params.date);
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT date, start_time, end_time, is_day_off 
+             FROM availability WHERE date = "${dateStr}";`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+        const config = rows[0] || { date: dateStr, start_time: '10:00', end_time: '20:00', is_day_off: false };
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ config }) };
+      }
+
+      if (params.action === 'busy_slots' && params.date) {
+        const dateStr = safe(params.date);
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT a.id AS id, a.appointment_date AS appointment_date
+             FROM appointments AS a
+             WHERE a.status = "confirmed" OR a.status = "pending"`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+
+        const busySlotsList = rows
+          .filter(r => {
+            if (!r.appointment_date) return false;
+            const ms = r.appointment_date > 1e10 ? r.appointment_date : r.appointment_date * 1000;
+            const d  = new Date(ms);
+            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+            return key === dateStr;
+          })
+          .map(r => {
+            const ms = r.appointment_date > 1e10 ? r.appointment_date : r.appointment_date * 1000;
+            const d  = new Date(ms);
+            return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+          });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ slots: busySlotsList }) };
+      }
+
+      if (params.action === 'get_messages' && params.appointment_id) {
+        const apptId = safe(params.appointment_id);
+        const viewerId = safe(params.viewer_id || '');
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT id, sender_id, sender_name, text, created_at, is_read
+             FROM messages WHERE appointment_id = "${apptId}"
+             ORDER BY created_at ASC;`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+        const unread = viewerId
+          ? rows.filter((m) => String(m.sender_id) !== viewerId && !m.is_read).length
+          : 0;
+        return {
+          statusCode: 200,
+          headers: HEADERS,
+          body: JSON.stringify({ messages: rows, unread_count: unread })
+        };
+      }
+
+      if (params.action === 'get_conversations') {
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT appointment_id, sender_id, sender_name, text, created_at, is_read
+             FROM messages
+             WHERE appointment_id LIKE "direct_%"
+             ORDER BY created_at DESC;`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+
+        const convMap = {};
+        rows.forEach(m => {
+          if (!convMap[m.appointment_id]) {
+            convMap[m.appointment_id] = {
+              room_id:     m.appointment_id,
+              client_id:   (m.appointment_id || '').replace('direct_', ''),
+              sender_name: m.sender_name,
+              last_message: m.text,
+              last_time:   m.created_at,
+              unread_count: 0
+            };
+          }
+          if (!m.is_read) {
+            convMap[m.appointment_id].unread_count += 1;
+          }
+        });
+
+        return {
+          statusCode: 200,
+          headers: HEADERS,
+          body: JSON.stringify({ conversations: Object.values(convMap) })
+        };
+      }
+
+      // Активные услуги для клиентов
+      const rows = await driver.tableClient.withSession(async (session) => {
+        const { resultSets } = await session.executeQuery(
+          'SELECT id, category, title, price, duration_minutes, is_active FROM services WHERE is_active = true;'
+        );
+        return parseResultSet(resultSets[0]);
+      });
+      return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ services: rows.map(formatService) }) };
+    }
+
+    // ════════════════════════════════════════
+    // POST
+    // ════════════════════════════════════════
+
+    if (event.httpMethod === 'POST') {
+      let body;
+      try { body = JSON.parse(event.body || '{}'); }
+      catch { return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Некорректный JSON' }) }; }
+
+      if (body.action === 'send_reminders') {
+        // Считаем "завтра" в UTC
+        const now = new Date();
+        const tomorrowStart = new Date(Date.UTC(
+          now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0
+        ));
+        const tomorrowEnd = new Date(Date.UTC(
+          now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 2, 0, 0, 0
+        ));
+        const tsStart = Math.floor(tomorrowStart.getTime() / 1000);
+        const tsEnd   = Math.floor(tomorrowEnd.getTime() / 1000);
+        console.log('[send_reminders POST] range:', tsStart, '->', tsEnd);
+
+        const rows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT a.id AS id, a.client_id AS client_id, a.client_name AS client_name, a.appointment_date AS appointment_date, s.title AS service_title
+             FROM appointments AS a
+             LEFT JOIN services AS s ON a.service_id = s.id
+             WHERE a.status = "confirmed" OR a.status = "pending"
+              ORDER BY a.appointment_date`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+
+        const filtered = rows.filter(r => {
+          const ts = Number(r.appointment_date);
+          return ts >= tsStart && ts < tsEnd;
+        });
+
+        const results = [];
+        for (const row of filtered) {
+          if (!row.client_id || row.client_id === 'manual') continue;
+          const timeStr = (() => {
+            const ms = row.appointment_date > 1e10
+              ? row.appointment_date
+              : row.appointment_date * 1000;
+            const d = new Date(ms);
+            const hh = String(d.getUTCHours()).padStart(2, '0');
+            const mm = String(d.getUTCMinutes()).padStart(2, '0');
+            return `${hh}:${mm}`;
+          })();
+
+          const message =
+            `💅 Напоминание от Natasha Premium Lab\n\n` +
+            `Завтра вас ждёт: ${row.service_title || 'процедура'}\n` +
+            `🕐 Время: ${timeStr}\n\n` +
+            `Ждём вас! Если нужно перенести — напишите нам.`;
+
+          await sendVkMessage(row.client_id, message);
+          results.push({ client_id: row.client_id, name: row.client_name, time: timeStr });
+        }
+
+        return {
+          statusCode: 200,
+          headers: HEADERS,
+          body: JSON.stringify({ ok: true, sent: results.length, results })
+        };
+      }
+
+      if (body.action === 'update_service') {
+        const { id, price, title, duration_minutes, is_active } = body;
+        if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
+        const setParts = [];
+        if (price !== undefined)            setParts.push(`price = CAST(${Math.round(Number(price))} AS Int32)`);
+        if (title !== undefined)            setParts.push(`title = "${safe(title)}"`);
+        if (duration_minutes !== undefined) setParts.push(`duration_minutes = CAST(${Math.round(Number(duration_minutes))} AS Int32)`);
+        if (is_active !== undefined)        setParts.push(`is_active = ${Boolean(is_active)}`);
+        if (!setParts.length) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нечего обновлять' }) };
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(`UPDATE services SET ${setParts.join(', ')} WHERE id = "${safe(id)}";`);
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      if (body.action === 'add_service') {
+        const { title, category, price, duration_minutes } = body;
+        if (!title || !category) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны title и category' }) };
+        const newId = `s_${Date.now()}`;
+
+        const p = Math.round(Number(price) || 0);
+        const d = Math.round(Number(duration_minutes) || 0);
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `INSERT INTO services (id, category, title, price, duration_minutes, is_active)
+             VALUES ("${newId}", "${safe(category)}", "${safe(title)}", CAST(${p} AS Int32), CAST(${d} AS Int32), true);`
+          );
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, id: newId }) };
+      }
+
+      if (body.action === 'delete_service') {
+        const { id } = body;
+        if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(`DELETE FROM services WHERE id = "${safe(id)}";`);
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      if (body.action === 'save_client_notes') {
+        const { client_id, notes } = body;
+        if (!client_id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен client_id' }) };
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `UPDATE appointments SET client_notes = "${safe(notes)}"
+             WHERE client_id = "${safe(client_id)}";`
+          );
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      if (body.action === 'save_client_profile') {
+        const { client_id, phone = '', telegram = '' } = body;
+        if (!client_id) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'no client_id' }) };
+        }
+
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `UPSERT INTO client_profiles (client_id, phone, telegram, updated_at)
+             VALUES ("${safe(client_id)}", "${safe(phone)}", "${safe(telegram)}", CurrentUtcDatetime());`
+          );
+        });
+
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      // ── Подтвердить запись → уведомить клиента ────────────
+      if (body.action === 'confirm_appointment') {
+        const { id, comment } = body;
+        if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
+
+        // Получаем данные записи ДО обновления
+        const apptRows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT a.client_id AS client_id, a.client_name AS client_name,
+             a.appointment_date AS appointment_date, s.title AS title, a.total_price AS total_price
+             FROM appointments AS a
+             LEFT JOIN services AS s ON a.service_id = s.id
+             WHERE a.id = "${safe(id)}";`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+
+        const now = new Date().toISOString().split('.')[0] + 'Z';
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `UPDATE appointments SET status = "confirmed", confirmed_at = CAST("${now}" AS Datetime)
+             WHERE id = "${safe(id)}";`
+          );
+        });
+
+        if (comment) {
+          await driver.tableClient.withSession(async (session) => {
+            await session.executeQuery(
+              `UPDATE appointments SET notes = "${safe(comment)}" WHERE id = "${safe(id)}";`
+            );
+          });
+        }
+
+        // Уведомляем клиента (не блокируем ответ)
+        const appt = apptRows[0];
+        if (appt?.client_id && appt.client_id !== 'manual') {
+          const dateStr  = formatDateRu(appt.appointment_date);
+          const priceStr = appt.total_price > 0 ? `\n💰 Стоимость: ${appt.total_price.toLocaleString('ru-RU')} ₽` : '';
+          const commentLine = comment ? `\n\n💬 ${comment}` : '';
+          sendVkMessage(appt.client_id,
+            `✅ Ваша запись подтверждена!\n\n` +
+            `💅 Услуга: ${appt.title || '—'}\n` +
+            `📅 Дата: ${dateStr}${priceStr}\n\n` +
+            `Ждём вас! Если нужно перенести — напишите нам.${commentLine}`
+          ).catch(() => {});
+        }
+
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      // ── Отменить запись → уведомить клиента ──────────────
+      if (body.action === 'cancel_appointment') {
+        const { id, comment } = body;
+        if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
+
+        // Получаем данные записи ДО обновления
+        const apptRows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT a.client_id AS client_id, a.appointment_date AS appointment_date, s.title AS title
+             FROM appointments AS a
+             LEFT JOIN services AS s ON a.service_id = s.id
+             WHERE a.id = "${safe(id)}";`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(`UPDATE appointments SET status = "cancelled" WHERE id = "${safe(id)}";`);
+        });
+
+        if (comment) {
+          await driver.tableClient.withSession(async (session) => {
+            await session.executeQuery(
+              `UPDATE appointments SET notes = "${safe(comment)}" WHERE id = "${safe(id)}";`
+            );
+          });
+        }
+
+        // Уведомляем клиента
+        const appt = apptRows[0];
+        if (appt?.client_id && appt.client_id !== 'manual') {
+          const dateStr = formatDateRu(appt.appointment_date);
+          const commentLine = comment ? `\n\n💬 ${comment}` : '';
+          sendVkMessage(appt.client_id,
+            `❌ Ваша запись отменена.\n\n` +
+            `💅 Услуга: ${appt.title || '—'}\n` +
+            `📅 Дата: ${dateStr}\n\n` +
+            `Хотите перенести? Запишитесь снова через приложение.${commentLine}`
+          ).catch(() => {});
+        }
+
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      if (body.action === 'complete_appointment') {
+        const { id, comment } = body;
+        if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(`UPDATE appointments SET status = "completed" WHERE id = "${safe(id)}";`);
+        });
+        if (comment) {
+          await driver.tableClient.withSession(async (session) => {
+            await session.executeQuery(
+              `UPDATE appointments SET notes = "${safe(comment)}" WHERE id = "${safe(id)}";`
+            );
+          });
+        }
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      // ── Перенести запись → уведомить клиента ─────────────
+      if (body.action === 'reschedule_appointment') {
+        const { id, new_date, new_time } = body;
+        if (!id || !new_date || !new_time) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны id, new_date, new_time' }) };
+        }
+
+        // Берём данные старой записи
+        const apptRows = await driver.tableClient.withSession(async (session) => {
+          const { resultSets } = await session.executeQuery(
+            `SELECT a.client_id AS client_id, a.client_name AS client_name,
+             a.service_id AS service_id, a.total_price AS total_price, s.title AS title
+             FROM appointments AS a
+             LEFT JOIN services AS s ON a.service_id = s.id
+             WHERE a.id = "${safe(id)}";`
+          );
+          return parseResultSet(resultSets[0]);
+        });
+
+        const old = apptRows[0];
+        if (!old) return { statusCode: 404, headers: HEADERS, body: JSON.stringify({ error: 'Запись не найдена' }) };
+
+        // Отменяем старую
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(`UPDATE appointments SET status = "cancelled" WHERE id = "${safe(id)}";`);
+        });
+
+        // Создаём новую pending
+        const newId   = `appt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const newDate = `${safe(new_date)}T${safe(new_time)}:00Z`;
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `INSERT INTO appointments (id, client_id, service_id, appointment_date, status, total_price, client_name)
+             VALUES ("${newId}", "${safe(String(old.client_id))}", "${safe(String(old.service_id))}",
+             CAST("${newDate}" AS Datetime), "pending",
+             CAST(${Math.round(Number(old.total_price) || 0)} AS Int32),
+             "${safe(old.client_name || '')}");`
+          );
+        });
+
+        // Уведомляем клиента
+        if (old.client_id && old.client_id !== 'manual') {
+          const newTs = new Date(newDate).getTime();
+          sendVkMessage(old.client_id,
+            `↺ Предложение о переносе записи\n\n` +
+            `💅 Услуга: ${old.title || '—'}\n` +
+            `📅 Новая дата: ${formatDateRu(newTs)} в ${safe(new_time)}\n\n` +
+            `Если вас устраивает — ждём! Если нет — напишите нам 💬`
+          ).catch(() => {});
+        }
+
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, new_id: newId }) };
+      }
+
+      if (body.action === 'add_appointment') {
+        const { service_id, client_name, client_phone, date, time, total_price, notes } = body;
+        if (!service_id || !date || !time) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны service_id, date, time' }) };
+        }
+        const id    = `appt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const aDate = `${safe(date)}T${safe(time)}:00Z`;
+        const price = Math.round(Number(total_price) || 0);
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `INSERT INTO appointments (id, client_id, service_id, appointment_date, status, total_price, client_name, client_phone, notes)
+             VALUES (
+               "${id}", "manual", "${safe(service_id)}",
+               CAST("${aDate}" AS Datetime), "confirmed",
+               CAST(${price} AS Int32),
+               "${safe(client_name)}", "${safe(client_phone)}", "${safe(notes)}"
+             );`
+          );
+        });
+        notifyMasters(
+          `📋 Ручная запись!\n👤 ${safe(client_name || 'Без имени')}\n📱 ${safe(client_phone || '')}\n💅 ${safe(service_id)}\n📅 ${safe(date)} в ${safe(time)}\n💰 ${price} ₽`
+        ).catch(() => {});
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, id }) };
+      }
+
+      if (body.action === 'set_availability') {
+        const { date, start_time, end_time, is_day_off } = body;
+        if (!date) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужна date' }) };
+        const id = `avail_${safe(date)}`;
+
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `UPSERT INTO availability (id, date, start_time, end_time, is_day_off)
+             VALUES ("${id}", "${safe(date)}", "${safe(start_time || '10:00')}", "${safe(end_time || '20:00')}", ${Boolean(is_day_off)});`
+          );
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      if (body.action === 'send_message') {
+        const { appointment_id, sender_id, sender_name, text } = body;
+
+        if (!appointment_id || !sender_id || !text) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны appointment_id, sender_id, text' }) };
+        }
+        const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const nowStr = new Date().toISOString().split('.')[0] + 'Z';
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `INSERT INTO messages (id, appointment_id, sender_id, sender_name, text, created_at, is_read)
+             VALUES ("${msgId}", "${safe(appointment_id)}", "${safe(String(sender_id))}",
+             "${safe(sender_name || '')}", "${safe(text)}",
+             CAST("${nowStr}" AS Datetime), false);`
+          );
+        });
+
+        const isMasterSender = MASTER_IDS.includes(String(sender_id));
+        if (isMasterSender) {
+          const apptRows = await driver.tableClient.withSession(async (session) => {
+            const { resultSets } = await session.executeQuery(
+              `SELECT client_id FROM appointments WHERE id = "${safe(appointment_id)}";`
+            );
+            return parseResultSet(resultSets[0]);
+          });
+          const clientId = apptRows[0]?.client_id || appointment_id.replace('direct_', '');
+          if (clientId && clientId !== 'manual') {
+            sendVkMessage(clientId,
+              `💬 Сообщение от мастера:\n\n${safe(text)}\n\nОткройте приложение чтобы ответить.`
+            ).catch(() => {});
+          }
+        } else {
+          notifyMasters(
+            `💬 Сообщение от ${safe(sender_name || 'клиента')}:\n\n${safe(text)}\n\nОткройте мастер-панель чтобы ответить.`
+          ).catch(() => {});
+        }
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, id: msgId }) };
+      }
+
+      if (body.action === 'mark_read') {
+        const { appointment_id, viewer_id } = body;
+        if (!appointment_id || !viewer_id) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны appointment_id, viewer_id' }) };
+        }
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `UPDATE messages SET is_read = true
+             WHERE appointment_id = "${safe(appointment_id)}"
+             AND sender_id != "${safe(String(viewer_id))}";`
+          );
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      const { service_id, client_id, date, totalPrice, client_name, client_phone, notes } = body;
+      if (!service_id || !client_id || !date) {
+        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны service_id, client_id, date' }) };
+      }
+      const id = `appt_${Date.now()}`;
+      await driver.tableClient.withSession(async (session) => {
+        await session.executeQuery(
+          `INSERT INTO appointments (id, client_id, service_id, appointment_date, status, total_price, client_name, client_phone, notes)
+           VALUES (
+             "${id}", "${safe(String(client_id))}", "${safe(service_id)}",
+             CAST("${safe(date)}" AS Datetime), "pending",
+             CAST(${Number(totalPrice) || 0} AS Int32),
+             "${safe(client_name || '')}", "${safe(client_phone || '')}", "${safe(notes || '')}"
+           );`
+        );
+      });
+      notifyMasters(
+        `🆕 Новая запись!\n👤 ${safe(client_name || client_id)}\n📱 ${safe(client_phone || '')}\n💅 ${safe(service_id)}\n📅 ${safe(date)}\n💰 ${Number(totalPrice) || 0} ₽`
+      ).catch(() => {});
+      return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, appointment_id: id }) };
+    }
+
+    return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Метод не поддерживается' }) };
+
+  } catch (err) {
+    _driver = null;
+    console.error('Handler error:', err);
+    return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: err.message }) };
+  }
+});

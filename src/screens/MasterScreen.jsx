@@ -1364,23 +1364,6 @@ export default function MasterScreen() {
   const enableMasterNotifications = useCallback(async () => {
     if (notifyEnabled) return;
 
-    // Администраторы группы не нуждаются в VKWebAppAllowMessagesFromGroup
-    // — у них разрешение уже есть по умолчанию
-    if (isMaster(user?.id)) {
-      try {
-        await bridge.send('VKWebAppStorageSet', {
-          key: 'master_notify_allowed',
-          value: '1'
-        }).catch(() => {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('master_notify_allowed', '1');
-          }
-        });
-      } catch (e) {}
-      setNotifyEnabled(true);
-      return;
-    }
-
     try {
       const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
         group_id: 237746914,
@@ -1414,6 +1397,30 @@ export default function MasterScreen() {
       }
     } catch (error) {
       console.error('Refresh notify permission failed:', error);
+    }
+  }, []);
+
+  const refreshMasterNotifyPermission = useCallback(async () => {
+    setNotifyEnabled(false);
+    await bridge.send('VKWebAppStorageSet', { key: 'master_notify_allowed', value: '' }).catch(() => {});
+    try {
+      const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
+        group_id: 237746914,
+        key: 'master_notify'
+      });
+      if (result?.result) {
+        await bridge.send('VKWebAppStorageSet', {
+          key: 'master_notify_allowed',
+          value: '1'
+        }).catch(() => {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('master_notify_allowed', '1');
+          }
+        });
+        setNotifyEnabled(true);
+      }
+    } catch (error) {
+      console.error('Refresh master notify failed:', error);
     }
   }, []);
 
@@ -1533,7 +1540,7 @@ export default function MasterScreen() {
               {pendingCount > 0 && (
                 <span className={styles.pendingBadge}>{pendingCount} новых</span>
               )}
-              <button className={styles.btnNotify} onClick={refreshClientNotifyPermission}>
+              <button className={styles.btnNotify} onClick={refreshMasterNotifyPermission}>
                 🔔 Обновить разрешение уведомлений
               </button>
               {notifyEnabled ? (

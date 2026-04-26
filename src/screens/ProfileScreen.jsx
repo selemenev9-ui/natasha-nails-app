@@ -13,7 +13,14 @@ function formatDate(timestamp) {
   if (!timestamp) return '—';
   // YDB Datetime возвращает секунды от эпохи
   const ms = timestamp > 1e10 ? timestamp : timestamp * 1000;
-  return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleString('ru-RU', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
 function HistorySection({ clientId, onNavigate, onChatRequest }) {

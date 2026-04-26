@@ -72,8 +72,11 @@ function ChatTab({ appointments, currentUser }) {
   const formatTs = (ts) => {
     if (!ts) return '';
     const ms = ts > 1e10 ? ts : ts * 1000;
-    const d = new Date(ms);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return new Date(ms).toLocaleTimeString('ru-RU', {
+      timeZone: 'UTC',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (!clients.length) {
@@ -264,17 +267,31 @@ function isMaster(userId) { return MASTER_IDS.includes(String(userId)); }
 function formatTs(ts) {
   if (!ts) return '—';
   const ms = ts > 1e10 ? ts : ts * 1000;
-  return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleString('ru-RU', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 function formatDate(ts) {
   if (!ts) return '—';
   const ms = ts > 1e10 ? ts : ts * 1000;
-  return new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  return new Date(ms).toLocaleDateString('ru-RU', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long'
+  });
 }
 function tsToTime(ts) {
   if (!ts) return '';
   const ms = ts > 1e10 ? ts : ts * 1000;
-  return new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString('ru-RU', {
+    timeZone: 'UTC',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 function dateKey(ts) {
   if (!ts) return '';

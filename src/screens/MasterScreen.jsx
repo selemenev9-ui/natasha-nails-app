@@ -1378,6 +1378,7 @@ export default function MasterScreen() {
   const [chatAppointment, setChatAppointment] = useState(null);
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
   const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [notifyFallback, setNotifyFallback] = useState(false);
   const modalOpenRef = useRef(false);
   const hasLoadedOnce = useRef(false);
   const pullStart = useRef(null);
@@ -1432,48 +1433,15 @@ export default function MasterScreen() {
       });
   }, []);
 
-  const enableMasterNotifications = useCallback(async () => {
-    if (notifyEnabled) return;
-
-    try {
-      const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
-        group_id: 237746914,
-        key: 'master_notify'
-      });
-      if (result?.result) {
-        await bridge.send('VKWebAppStorageSet', {
-          key: 'master_notify_allowed',
-          value: '1'
-        }).catch(() => {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('master_notify_allowed', '1');
-          }
-        });
-        setNotifyEnabled(true);
-      }
-    } catch (e) {
-      console.log('Notify result error:', e);
-    }
-  }, [notifyEnabled, user?.id]);
-
-  const refreshClientNotifyPermission = useCallback(async () => {
-    try {
-      await bridge.send('VKWebAppStorageSet', { key: 'notify_allowed', value: '' }).catch(() => {});
-      const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
-        group_id: 237746914,
-        key: 'notify_booking'
-      });
-      if (result?.result) {
-        await bridge.send('VKWebAppStorageSet', { key: 'notify_allowed', value: '1' }).catch(() => {});
-      }
-    } catch (error) {
-      console.error('Refresh notify permission failed:', error);
-    }
-  }, []);
-
-  const refreshMasterNotifyPermission = useCallback(async () => {
+  const requestMasterNotify = useCallback(async () => {
     setNotifyEnabled(false);
-    await bridge.send('VKWebAppStorageSet', { key: 'master_notify_allowed', value: '' }).catch(() => {});
+    setNotifyFallback(false);
+    await bridge.send('VKWebAppStorageSet', { key: 'master_notify_allowed', value: '' }).catch(() => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('master_notify_allowed');
+      }
+    });
+
     try {
       const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
         group_id: 237746914,
@@ -1489,9 +1457,13 @@ export default function MasterScreen() {
           }
         });
         setNotifyEnabled(true);
+        setNotifyFallback(false);
+      } else {
+        setNotifyFallback(true);
       }
     } catch (error) {
-      console.error('Refresh master notify failed:', error);
+      console.error('Master notify request failed:', error);
+      setNotifyFallback(true);
     }
   }, []);
 
@@ -1626,20 +1598,57 @@ export default function MasterScreen() {
               {pendingCount > 0 && (
                 <span className={styles.pendingBadge}>{pendingCount} новых</span>
               )}
-              <button className={styles.btnNotify} onClick={refreshMasterNotifyPermission}>
-                🔔 Обновить разрешение уведомлений
-              </button>
+
               {notifyEnabled ? (
-                <button className={styles.btnNotifyActive} disabled>
-                  ✅ Уведомления включены
-                </button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button className={styles.btnNotifyActive} disabled>
+                    ✅ Уведомления включены
+                  </button>
+                  <button
+                    className={styles.btnNotify}
+                    style={{ fontSize: 12, padding: '6px 8px' }}
+                    onClick={requestMasterNotify}
+                    title="Переподключить уведомления"
+                  >
+                    🔄
+                  </button>
+                </div>
               ) : (
-                <button className={styles.btnNotify} onClick={enableMasterNotifications}>
+                <button className={styles.btnNotify} onClick={requestMasterNotify}>
                   🔔 Включить уведомления
                 </button>
               )}
+
               <button className={styles.btnRefresh} onClick={loadData}>↻</button>
             </div>
+
+            {notifyFallback && (
+              <div
+                style={{
+                  background: 'rgba(239,68,68,0.12)',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: 12,
+                  padding: '10px 14px',
+                  marginTop: 8,
+                  fontSize: 13,
+                  color: '#fca5a5',
+                  lineHeight: 1.5
+                }}
+              >
+                ВК не показал диалог — скорее всего разрешение было ранее отклонено.
+                <br />
+                <strong>Что делать:</strong> напишите любое сообщение в группу →{' '}
+                <a
+                  href="https://vk.me/natasha_premium_lab"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: '#93c5fd' }}
+                >
+                  Написать в группу
+                </a>
+                {' '}→ затем нажмите 🔄 повторно.
+              </div>
+            )}
           </div>
 
           <div className={styles.tabsScroll}>

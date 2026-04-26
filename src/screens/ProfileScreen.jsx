@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import bridge from '@vkontakte/vk-bridge';
+
 import { AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import BeautyCard from '../components/BeautyCard.jsx';
@@ -285,6 +287,28 @@ export default function ProfileScreen({ onNavigate }) {
 
         <footer className={styles.footer}>
           <button className={styles.ctaButton} onClick={openAdmin}>Написать администратору</button>
+          <button
+            className={styles.ctaButton}
+            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', fontSize: 13 }}
+            onClick={async () => {
+              try {
+                const result = await bridge.send('VKWebAppAllowMessagesFromGroup', {
+                  group_id: 237746914,
+                  key: 'notify_booking'
+                });
+                if (result?.result) {
+                  bridge.send('VKWebAppStorageSet', { key: 'notify_allowed', value: '1' }).catch(() => {});
+                  if (typeof window !== 'undefined') {
+                    window.alert('✅ Уведомления о записях включены!');
+                  }
+                }
+              } catch (e) {
+                window.open('https://vk.me/natasha_premium_lab', '_blank');
+              }
+            }}
+          >
+            🔔 Включить уведомления о записях
+          </button>
         </footer>
       </div>
       <AnimatePresence>

@@ -677,14 +677,13 @@ export const handler = (async (event) => {
             `Ждём вас! Если нужно перенести — напишите нам.${commentLine}`
           ).catch(() => {});
         }
-
-        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
       }
 
       // ── Отменить запись → уведомить клиента ──────────────
       if (body.action === 'cancel_appointment') {
         const { id, comment } = body;
         if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
+
 
         // Получаем данные записи ДО обновления
         const apptRows = await driver.tableClient.withSession(async (session) => {
@@ -725,8 +724,22 @@ export const handler = (async (event) => {
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
       }
 
+      if (body.action === 'delete_appointment') {
+        const { id } = body;
+        if (!id) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'no id' }) };
+        }
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `DELETE FROM appointments WHERE id = "${safe(id)}";`
+          );
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
       if (body.action === 'complete_appointment') {
         const { id, comment } = body;
+
         if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
         await driver.tableClient.withSession(async (session) => {
           await session.executeQuery(`UPDATE appointments SET status = "completed" WHERE id = "${safe(id)}";`);

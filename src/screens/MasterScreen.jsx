@@ -288,7 +288,7 @@ function todayKey() {
 }
 
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
-function TodayTab({ appointments, services, onAction, onAddManual, onReschedule, onChat }) {
+function TodayTab({ appointments, services, onAction, onAddManual, onReschedule, onChat, onDelete }) {
   const today = todayKey();
   const todayAppts = appointments
     .filter(a => dateKey(a.appointment_date) === today)
@@ -389,6 +389,7 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule,
               onAction={onAction}
               onReschedule={onReschedule}
               onChat={onChat}
+              onDelete={onDelete}
               showActions
             />
           ))}
@@ -430,7 +431,7 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule,
 }
 
 // ─── APP CARD ─────────────────────────────────────────────────────────────────
-function AppCard({ a, onAction, showActions, onReschedule, onChat }) {
+function AppCard({ a, onAction, showActions, onReschedule, onChat, onDelete }) {
   const st = STATUS_LABELS[a.status] || STATUS_LABELS.pending;
   const [expanded, setExpanded] = useState(false);
   const clientLabel = normalizeName(a.client_name || `VK: ${a.client_id}`);
@@ -566,6 +567,21 @@ function AppCard({ a, onAction, showActions, onReschedule, onChat }) {
                 )}
               </div>
             )}
+            {showActions && a.status === 'cancelled' && onDelete && (
+              <div className={styles.actionsRow}>
+                <button
+                  className={styles.btnCancel}
+                  style={{ fontSize: 12 }}
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && window.confirm('Удалить эту запись навсегда?')) {
+                      onDelete(a.id);
+                    }
+                  }}
+                >
+                  🗑 Удалить
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -580,8 +596,9 @@ function AppCard({ a, onAction, showActions, onReschedule, onChat }) {
 }
 
 // ─── SCHEDULE TAB ─────────────────────────────────────────────────────────────
-function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat }) {
+function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat, onDelete }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
+  const [showCancelled, setShowCancelled] = useState(false);
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -591,6 +608,7 @@ function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat
 
   const dayAppts = appointments
     .filter(a => dateKey(a.appointment_date) === selectedDate)
+    .filter(a => showCancelled || a.status !== 'cancelled')
     .sort((a, b) => a.appointment_date - b.appointment_date);
 
   return (
@@ -599,7 +617,7 @@ function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat
       <div className={styles.dayPicker}>
         {days.map(day => {
           const d = new Date(day + 'T12:00:00');
-          const hasAppts = appointments.some(a => dateKey(a.appointment_date) === day);
+          const hasAppts = appointments.some(a => dateKey(a.appointment_date) === day && a.status !== 'cancelled');
           return (
             <button key={day}
               className={`${styles.dayBtn} ${selectedDate === day ? styles.dayBtnActive : ''} glass-panel`}
@@ -614,6 +632,16 @@ function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat
         })}
       </div>
 
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <button
+          className={showCancelled ? styles.btnSave : styles.btnCancel}
+          style={{ fontSize: 12, padding: '4px 10px' }}
+          onClick={() => setShowCancelled((v) => !v)}
+        >
+          {showCancelled ? '🙈 Скрыть отменённые' : '👁 Показать отменённые'}
+        </button>
+      </div>
+
       {dayAppts.length === 0
         ? <p className={styles.empty}>Записей нет</p>
         : dayAppts.map((a) => (
@@ -624,6 +652,7 @@ function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat
               onReschedule={onReschedule}
               onChat={onChat}
               showActions
+              onDelete={onDelete}
             />
           ))
       }
@@ -640,6 +669,7 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
   const [savingNotes, setSavingNotes] = useState(false);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [clientProfile, setClientProfile] = useState(null);
+  const [clientHistory, setClientHistory] = useState([]);
   const clientModalRef = useRef(false);
 
   useEffect(() => {
@@ -688,17 +718,22 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
     setLoadingNotes(true);
     setClientProfile(null);
     try {
-      const [notesRes, profileRes] = await Promise.all([
+      const [notesRes, profileRes, historyRes] = await Promise.all([
         fetch(`${API_URL}?action=client_notes&client_id=${c.id}`).then((r) => r.json()),
         fetch(`${API_URL}?action=get_client_profile&client_id=${c.id}`)
           .then((r) => r.json())
-          .catch(() => ({ profile: null }))
+          .catch(() => ({ profile: null })),
+        fetch(`${API_URL}?action=history&client_id=${c.id}`)
+          .then((r) => r.json())
+          .catch(() => ({ appointments: [] }))
       ]);
       setNotes(notesRes.notes || '');
       setClientProfile(profileRes.profile || null);
+      setClientHistory(historyRes.appointments || []);
     } catch (e) {
       setNotes('');
       setClientProfile(null);
+      setClientHistory([]);
     }
     setLoadingNotes(false);
   };
@@ -847,6 +882,41 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
                 </a>
               </div>
 
+              {clientHistory.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <p className={styles.label}>📋 История визитов</p>
+                  {clientHistory.map((a) => {
+                    const isCancelled = a.status === 'cancelled';
+                    return (
+                      <div
+                        key={a.id}
+                        style={{
+                          padding: '8px 10px',
+                          marginBottom: 6,
+                          borderRadius: 10,
+                          background: isCancelled ? 'rgba(239,68,68,0.07)' : 'rgba(255,255,255,0.05)',
+                          borderLeft: `3px solid ${isCancelled ? '#ef4444' : '#10b981'}`,
+                          opacity: isCancelled ? 0.7 : 1
+                        }}
+                      >
+                        <p className={styles.cardTitle} style={{ fontSize: 13, margin: 0 }}>
+                          {a.title || a.service_id}
+                        </p>
+                        <p className={styles.cardSub} style={{ margin: '2px 0 0' }}>
+                          {formatTs(a.appointment_date)} ·
+                          {isCancelled
+                            ? ' ❌ Отменено'
+                            : a.status === 'completed'
+                              ? ' ✅ Выполнено'
+                              : ' 🕐 Подтверждено'}
+                          {a.total_price > 0 && ` · ${a.total_price.toLocaleString('ru-RU')} ₽`}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <button className={styles.btnCancel} onClick={closeClient}>
                 Закрыть
               </button>
@@ -862,28 +932,29 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
 function AnalyticsTab({ appointments, services }) {
   if (!appointments.length) return renderEmptyState('📊', 'Данные появятся после первых визитов');
 
+  const active = appointments.filter((a) => a.status === 'confirmed' || a.status === 'completed');
   const now = new Date();
-  const thisMonth = appointments.filter(a => {
+  const thisMonth = active.filter(a => {
     const d = new Date(a.appointment_date > 1e10 ? a.appointment_date : a.appointment_date * 1000);
     return d.getUTCMonth() === now.getUTCMonth() && d.getUTCFullYear() === now.getUTCFullYear();
   });
-  const thisWeek = appointments.filter(a => {
+  const thisWeek = active.filter(a => {
     const ms = a.appointment_date > 1e10 ? a.appointment_date : a.appointment_date * 1000;
     return (Date.now() - ms) < 7 * 86400 * 1000;
   });
 
   const monthRevenue = thisMonth.reduce((s, a) => s + (a.total_price || 0), 0);
   const weekRevenue  = thisWeek.reduce((s, a) => s + (a.total_price || 0), 0);
-  const totalRevenue = appointments.reduce((s, a) => s + (a.total_price || 0), 0);
-  const completed    = appointments.filter(a => a.status === 'completed').length;
-  const uniqueClients = new Set(appointments.map(a => a.client_id)).size;
+  const totalRevenue = active.reduce((s, a) => s + (a.total_price || 0), 0);
+  const completed    = active.filter(a => a.status === 'completed').length;
+  const uniqueClients = new Set(active.map(a => a.client_id)).size;
   const repeatClients = Object.values(
-    appointments.reduce((acc, a) => { acc[a.client_id] = (acc[a.client_id] || 0) + 1; return acc; }, {})
+    active.reduce((acc, a) => { acc[a.client_id] = (acc[a.client_id] || 0) + 1; return acc; }, {})
   ).filter(v => v > 1).length;
 
   // Выручка в час по услугам
   const serviceStats = {};
-  appointments.forEach(a => {
+  active.forEach(a => {
     const key = a.title || a.service_id;
     const svc = services.find(s => s.id === a.service_id);
     const mins = svc?.durationMinutes || svc?.duration_minutes || 60;
@@ -936,7 +1007,7 @@ function AnalyticsTab({ appointments, services }) {
             const date = new Date();
             date.setDate(date.getDate() - (6 - idx));
             const key = dateKey(date.getTime());
-            const revenue = appointments
+            const revenue = active
               .filter(a => dateKey(a.appointment_date) === key)
               .reduce((sum, appt) => sum + (appt.total_price || 0), 0);
             return { key, revenue, label: date.toLocaleDateString('ru-RU', { weekday: 'short' }).replace('.', '') };
@@ -1458,6 +1529,21 @@ export default function MasterScreen() {
     }
   };
 
+  const handleDeleteAppointment = useCallback(async (id) => {
+    if (!id) return;
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_appointment', id })
+      });
+    } catch (error) {
+      console.error('Delete appointment failed:', error);
+    } finally {
+      loadData();
+    }
+  }, [loadData]);
+
   const handleReschedule = async (date, time) => {
     if (!rescheduleTarget) return;
     const appointment = rescheduleTarget;
@@ -1582,6 +1668,7 @@ export default function MasterScreen() {
                 onAddManual={openManualModal}
                 onReschedule={setRescheduleTarget}
                 onChat={setChatAppointment}
+                onDelete={handleDeleteAppointment}
               />
             )}
             {tab === 'schedule'  && (
@@ -1591,6 +1678,7 @@ export default function MasterScreen() {
                 onAddManual={openManualModal}
                 onReschedule={setRescheduleTarget}
                 onChat={setChatAppointment}
+                onDelete={handleDeleteAppointment}
               />
             )}
             {tab === 'clients'   && <ClientsTab appointments={appointments} onModalOpen={markModalOpen} onModalClose={markModalClosed} />}

@@ -179,8 +179,44 @@ export default function ProfileScreen({ onNavigate }) {
   const avatar = user?.photo_200 || '';
   const [chatAppt, setChatAppt] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [contactForm, setContactForm] = useState({ phone: '', telegram: '' });
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactLoaded, setContactLoaded] = useState(false);
 
   const openAdmin = () => window.open('https://vk.me/natasha_premium_lab', '_blank');
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setContactLoaded(false);
+    fetch(`${API_URL}?action=get_client_profile&client_id=${user.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.profile) {
+          setContactForm({
+            phone: data.profile.phone || '',
+            telegram: data.profile.telegram || ''
+          });
+        }
+        setContactLoaded(true);
+      })
+      .catch(() => setContactLoaded(true));
+  }, [user?.id]);
+
+  const saveContact = async () => {
+    if (!user?.id) return;
+    setSavingContact(true);
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save_client_profile',
+        client_id: String(user.id),
+        phone: contactForm.phone,
+        telegram: contactForm.telegram
+      })
+    }).catch(() => {});
+    setSavingContact(false);
+  };
 
   return (
     <div className={styles.profile}>
@@ -198,6 +234,36 @@ export default function ProfileScreen({ onNavigate }) {
             <BeautyCard firstName={user?.first_name} vkId={user?.id} theme="dark" />
           </div>
         </section>
+
+        {user?.id && (
+          <section className={styles.beautyIdSection}>
+            <p className={styles.sectionLabel}>Мои контакты</p>
+            <div className={styles.contactForm}>
+              <input
+                className={styles.contactInput}
+                type="tel"
+                placeholder="📞 Телефон (+7...)"
+                value={contactForm.phone}
+                onChange={(e) => setContactForm((f) => ({ ...f, phone: e.target.value }))}
+              />
+              <input
+                className={styles.contactInput}
+                type="text"
+                placeholder="✈️ Telegram (@username)"
+                value={contactForm.telegram}
+                onChange={(e) => setContactForm((f) => ({ ...f, telegram: e.target.value }))}
+              />
+              <button
+                className={styles.ctaButton}
+                style={{ marginTop: 8, padding: '10px 0', width: '100%' }}
+                disabled={savingContact || !contactLoaded}
+                onClick={saveContact}
+              >
+                {savingContact ? 'Сохранение…' : '💾 Сохранить контакты'}
+              </button>
+            </div>
+          </section>
+        )}
 
         <section className={styles.beautyIdSection}>
           <button

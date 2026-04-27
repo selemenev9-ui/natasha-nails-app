@@ -1211,9 +1211,12 @@ function ManualBookingModal({ services, onClose, onSave, onModalOpen, onModalClo
   const handleSave = async () => {
     if (!form.service_id || !form.date || !form.time) return;
     setSaving(true);
+    const clientId = form.client_name
+      ? `manual_${form.client_name.trim().toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`
+      : `manual_${Date.now()}`;
     await fetch(API_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add_appointment', ...form })
+      body: JSON.stringify({ action: 'add_appointment', ...form, manual_client_id: clientId })
     });
     setSaving(false);
     onSave();

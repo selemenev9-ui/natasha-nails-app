@@ -809,22 +809,23 @@ export const handler = (async (event) => {
       }
 
       if (body.action === 'add_appointment') {
-        const { service_id, client_name, client_phone, date, time, total_price, notes } = body;
+        const { service_id, client_name, client_phone, date, time, total_price, notes, manual_client_id } = body;
         if (!service_id || !date || !time) {
           return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны service_id, date, time' }) };
         }
         const id    = `appt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const aDate = `${safe(date)}T${safe(time)}:00Z`;
         const price = Math.round(Number(total_price) || 0);
+        const manualClientId = manual_client_id || `manual_${Date.now()}`;
         await driver.tableClient.withSession(async (session) => {
           await session.executeQuery(
             `INSERT INTO appointments (id, client_id, service_id, appointment_date, status, total_price, client_name, client_phone, notes)
              VALUES (
-               "${id}", "manual", "${safe(service_id)}",
+               "${id}", "${safe(manualClientId)}", "${safe(service_id)}",
                CAST("${aDate}" AS Datetime), "confirmed",
                CAST(${price} AS Int32),
                "${safe(client_name)}", "${safe(client_phone)}", "${safe(notes)}"
-             );`
+            );`
           );
         });
         notifyMasters(

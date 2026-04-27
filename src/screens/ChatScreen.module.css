@@ -1,0 +1,112 @@
+.screen {
+  min-height: 100dvh;
+  padding-bottom: var(--tabbar-space);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 24px 20px 16px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 400;
+  margin: 0 0 4px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--ink-60);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.list {
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chatCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(100,180,255,0.12), transparent 60%),
+    linear-gradient(135deg, rgba(8,20,36,0.88), rgba(2,6,12,0.9));
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.14),
+    0 8px 32px rgba(1,7,14,0.4);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.chatCard:active {
+  border-color: rgba(100,180,255,0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 12px 40px rgba(15,70,160,0.35);
+}
+
+.cardAvatarWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cardAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1B4F8A, #0D3560);
+  border: 1.5px solid rgba(100,180,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(140,200,255,0.85);
+  box-shadow: 0 0 20px rgba(30,100,200,0.3);
+}
+
+.cardOnlineDot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #4CD964;
+  border: 2px solid #010910;
+  box-shadow: 0 0 8px rgba(76,217,100,0.7);
+}
+
+.cardInfo { flex: 1; min-width: 0; }
+
+.cardName {
+  margin: 0 0 3px;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(237,244,255,0.95);
+}
+
+.cardSub {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(140,200,255,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardArrow {
+  color: rgba(140,200,255,0.35);
+  flex-shrink: 0;
+}

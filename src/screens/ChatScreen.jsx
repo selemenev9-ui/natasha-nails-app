@@ -1,8 +1,27 @@
 import { useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import ChatDrawer from '../components/ChatDrawer.jsx';
-import styles from './ProfileScreen.module.css';
+import styles from './ChatScreen.module.css';
+
+function IconChevronRight() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18L15 12L9 6" />
+    </svg>
+  );
+}
+
+function IconNail() {
+  return (
+    <svg viewBox="0 0 32 32" width="26" height="26" fill="none"
+      stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="16" cy="10" rx="7" ry="5" />
+      <path d="M9 10c0 8 2 14 7 14s7-6 7-14" />
+    </svg>
+  );
+}
 
 export default function ChatScreen() {
   const { user } = useVK();
@@ -10,41 +29,32 @@ export default function ChatScreen() {
   const chatRoomId = user?.id ? `direct_${user.id}` : null;
 
   return (
-    <div className={styles.profile}>
-      <div className={styles.inner}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>Сообщения</h1>
-        </header>
+    <div className={styles.screen}>
+      <header className={styles.header}>
+        <h1 className={styles.title}>Сообщения</h1>
+        <p className={styles.subtitle}>Чат с вашим мастером</p>
+      </header>
 
-        <div style={{ padding: '20px 0' }}>
-          <div
-            className="glass-panel"
-            style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', padding: 20 }}
-            onClick={() => setChatOpen(true)}
-          >
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: '50%',
-                border: '1px solid var(--ink)',
-                color: 'var(--ink)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 22,
-                flexShrink: 0
-              }}
-            >
-              💅
+      <div className={styles.list}>
+        <motion.div
+          className={styles.chatCard}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setChatOpen(true)}
+        >
+          <div className={styles.cardAvatarWrap}>
+            <div className={styles.cardAvatar}>
+              <IconNail />
             </div>
-            <div>
-              <p style={{ fontWeight: 600, margin: 0, fontSize: 16 }}>Natasha Premium Lab</p>
-              <p style={{ color: '#888', margin: '2px 0 0', fontSize: 13 }}>Написать мастеру</p>
-            </div>
-            <span style={{ marginLeft: 'auto', fontSize: 20, color: 'var(--ink-30)' }}>›</span>
+            <span className={styles.cardOnlineDot} />
           </div>
-        </div>
+          <div className={styles.cardInfo}>
+            <p className={styles.cardName}>Natasha Premium Lab</p>
+            <p className={styles.cardSub}>Написать мастеру...</p>
+          </div>
+          <span className={styles.cardArrow}>
+            <IconChevronRight />
+          </span>
+        </motion.div>
       </div>
 
       <AnimatePresence>

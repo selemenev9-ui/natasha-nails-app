@@ -11,6 +11,7 @@ import MasterScreen from './screens/MasterScreen.jsx';
 import OnboardingScreen from './screens/OnboardingScreen.jsx';
 import TabBar from './components/TabBar.jsx';
 import NeuralBackground from './components/NeuralBackground.jsx';
+import SplashScreen from './components/SplashScreen.jsx';
 import { useVK } from './contexts/VKContext.jsx';
 
 /**
@@ -33,41 +34,6 @@ const pageVariants = {
     transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }
   }
 };
-
-function SplashScreen() {
-  return (
-    <motion.div
-      initial={{ opacity: 1 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.8, ease: 'easeOut' } }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'var(--ink)',
-        display: 'grid',
-        placeItems: 'center',
-        zIndex: 999,
-        pointerEvents: 'none'
-      }}
-    >
-      <motion.span
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 1.04, transition: { duration: 0.8, ease: 'easeInOut' } }}
-        transition={{ duration: 1.5, ease: 'easeOut' }}
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: '28px',
-          letterSpacing: '0.45em',
-          color: 'var(--cream)',
-          textTransform: 'uppercase'
-        }}
-      >
-        NATASHA LAB
-      </motion.span>
-    </motion.div>
-  );
-}
 
 export default function App() {
   const { isBridgeLoading, isFirstVisit, isVKEnv, completeOnboarding } = useVK();

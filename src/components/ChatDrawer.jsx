@@ -213,8 +213,11 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     try {
       const viewerQuery = currentUserId ? `&viewer_id=${currentUserId}` : '';
       const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}`);
+      if (!res.ok) return;
       const data = await res.json();
-      setMessages(data.messages || []);
+      if (Array.isArray(data.messages)) {
+        setMessages(data.messages);
+      }
       setPeerTyping((data.typing || []).length > 0);
     } catch {}
   };

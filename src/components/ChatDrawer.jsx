@@ -233,7 +233,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 5000);
+    const interval = setInterval(load, 12000);
     return () => clearInterval(interval);
   }, [appointmentId, currentUserId]);
 

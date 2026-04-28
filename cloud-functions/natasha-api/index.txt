@@ -139,7 +139,7 @@ async function getDriver() {
     endpoint,
     database,
     authService: getCredentialsFromEnv(),
-    poolSettings: { minLimit: 0, maxLimit: 3 }
+    poolSettings: { minLimit: 0, maxLimit: 2 }
   });
   try {
     if (!(await driver.ready(8000))) throw new Error('YDB не ответил');
@@ -172,6 +172,7 @@ async function withSession(fn) {
         await _driver.destroy().catch(() => {});
       }
       _driver = null;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       const driver = await getDriver();
       return await driver.tableClient.withSession(fn);
     }

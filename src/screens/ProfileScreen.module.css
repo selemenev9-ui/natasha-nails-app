@@ -289,6 +289,26 @@
   white-space: nowrap;
 }
 
+.chatFromVisitBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(100,180,255,0.25);
+  background: rgba(100,180,255,0.08);
+  color: rgba(140,200,255,0.8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  font-family: inherit;
+}
+
+.chatFromVisitBtn:hover {
+  background: rgba(100,180,255,0.15);
+  border-color: rgba(100,180,255,0.4);
+}
+
 .rebookBtn {
   align-self: flex-end;
   border: none;

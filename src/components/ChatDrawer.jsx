@@ -90,8 +90,10 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [peerTyping, setPeerTyping] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const typingRef = useRef(0);
 
   const load = async () => {
     if (!appointmentId) return;
@@ -100,6 +102,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}`);
       const data = await res.json();
       setMessages(data.messages || []);
+      setPeerTyping((data.typing || []).length > 0);
     } catch {}
   };
 
@@ -216,6 +219,20 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const insertEmoji = (emoji) => {
     setText((prev) => prev + emoji);
     inputRef.current?.focus();
+  };
+
+  const handleTextChange = (e) => {
+    const next = e.target.value;
+    setText(next);
+    if (!appointmentId || !currentUserId) return;
+    const now = Date.now();
+    if (typingRef.current && now - typingRef.current < 1500) return;
+    typingRef.current = now;
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_typing', room_id: appointmentId, user_id: currentUserId })
+    }).catch(() => {});
   };
 
   const formatTs = (ts) => {
@@ -355,6 +372,23 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
               );
             })}
           </AnimatePresence>
+          <AnimatePresence>
+            {peerTyping && (
+              <motion.div
+                className={styles.typingWrap}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className={styles.typingBubble}>
+                  <span className={styles.typingDot} />
+                  <span className={styles.typingDot} />
+                  <span className={styles.typingDot} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <div ref={bottomRef} />
         </div>
 
@@ -401,7 +435,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           <textarea
             ref={inputRef}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={handleTextChange}
             onKeyDown={handleKey}
             placeholder="Написать..."
             rows={1}

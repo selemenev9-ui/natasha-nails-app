@@ -165,6 +165,17 @@ function HistorySection({ clientId, onNavigate, onChatRequest }) {
                 )}
               </div>
               <button
+                className={styles.chatFromVisitBtn}
+                type="button"
+                onClick={() => onNavigate?.('chat')}
+              >
+                <svg viewBox="0 0 20 20" width="14" height="14" fill="none"
+                  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 3h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4.5L7 18v-3H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+                </svg>
+                Написать
+              </button>
+              <button
                 className={styles.rebookBtn}
                 type="button"
                 onClick={() => onNavigate?.('booking', {

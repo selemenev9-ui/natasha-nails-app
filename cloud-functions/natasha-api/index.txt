@@ -431,7 +431,7 @@ export const handler = (async (event) => {
 
       if (params.action === 'get_messages' && params.appointment_id) {
         const apptId = safe(params.appointment_id);
-        const viewerId = safe(params.viewer_id || '');
+        const viewerId = params.viewer_id ? String(params.viewer_id) : '';
         const rows = await driver.tableClient.withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT id, sender_id, sender_name, text, created_at, is_read
@@ -443,10 +443,24 @@ export const handler = (async (event) => {
         const unread = viewerId
           ? rows.filter((m) => String(m.sender_id) !== viewerId && !m.is_read).length
           : 0;
+        const nowTs = Math.floor(Date.now() / 1000);
+        let typingUsers = [];
+        try {
+          await driver.tableClient.withSession(async (session) => {
+            const { resultSets } = await session.executeQuery(
+              `SELECT user_id FROM typing_status
+               WHERE room_id = "${apptId}" AND updated_at > CAST(${nowTs - 5} AS Uint32);`
+            );
+            const typingRows = parseResultSet(resultSets[0]);
+            typingUsers = typingRows
+              .map((row) => String(row.user_id))
+              .filter((uid) => uid && uid !== viewerId);
+          });
+        } catch {}
         return {
           statusCode: 200,
           headers: HEADERS,
-          body: JSON.stringify({ messages: rows, unread_count: unread })
+          body: JSON.stringify({ messages: rows, unread_count: unread, typing: typingUsers })
         };
       }
 
@@ -885,6 +899,21 @@ export const handler = (async (event) => {
           ).catch(() => {});
         }
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, id: msgId }) };
+      }
+
+      if (body.action === 'set_typing') {
+        const { room_id, user_id } = body;
+        if (!room_id || !user_id) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'missing fields' }) };
+        }
+        const nowTs = Math.floor(Date.now() / 1000);
+        await driver.tableClient.withSession(async (session) => {
+          await session.executeQuery(
+            `UPSERT INTO typing_status (room_id, user_id, updated_at)
+             VALUES ("${safe(room_id)}", "${safe(user_id)}", CAST(${nowTs} AS Uint32));`
+          );
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
       }
 
       if (body.action === 'mark_read') {

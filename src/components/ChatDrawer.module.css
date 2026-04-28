@@ -201,6 +201,30 @@
   cursor: pointer;
 }
 
+.typingWrap { display: flex; padding: 2px 0 6px; }
+.typingBubble {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px 18px 18px 4px;
+  padding: 10px 14px;
+}
+.typingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(140,200,255,0.65);
+  animation: typingBounce 1.3s infinite ease-in-out;
+}
+.typingDot:nth-child(2) { animation-delay: 0.18s; }
+.typingDot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
 .bookingCard {
   background: linear-gradient(135deg, rgba(12, 50, 100, 0.92), rgba(5, 25, 55, 0.96));
   border: 1px solid rgba(100, 180, 255, 0.22);

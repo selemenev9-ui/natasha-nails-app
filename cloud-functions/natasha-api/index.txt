@@ -125,18 +125,24 @@ let _driver = null;
 async function getDriver() {
   if (_driver) {
     try {
-      if (await _driver.ready(2000)) return _driver;
+      if (await _driver.ready(1500)) return _driver;
     } catch {
     }
+
     if (typeof _driver.destroy === 'function') {
       await _driver.destroy().catch(() => {});
     }
     _driver = null;
   }
 
-  const driver = new Driver({ endpoint, database, authService: getCredentialsFromEnv() });
+  const driver = new Driver({
+    endpoint,
+    database,
+    authService: getCredentialsFromEnv(),
+    poolSettings: { minLimit: 0, maxLimit: 3 }
+  });
   try {
-    if (!(await driver.ready(15000))) throw new Error('YDB не ответил');
+    if (!(await driver.ready(8000))) throw new Error('YDB не ответил');
     _driver = driver;
     return _driver;
   } catch (err) {
@@ -144,6 +150,31 @@ async function getDriver() {
       await driver.destroy().catch(() => {});
     }
     if (_driver === driver) _driver = null;
+    throw err;
+  }
+}
+
+async function withSession(fn) {
+  try {
+    const driver = await getDriver();
+    return await driver.tableClient.withSession(fn);
+  } catch (err) {
+    const msg = err?.message || '';
+    const needRetry =
+      msg.includes('Session not found') ||
+      msg.includes('Connection dropped') ||
+      msg.includes('UNAVAILABLE') ||
+      msg.includes('RESOURCE_EXHAUSTED') ||
+      msg.includes('ResourcesExhausted') ||
+      msg.includes('session');
+    if (needRetry) {
+      if (_driver && typeof _driver.destroy === 'function') {
+        await _driver.destroy().catch(() => {});
+      }
+      _driver = null;
+      const driver = await getDriver();
+      return await driver.tableClient.withSession(fn);
+    }
     throw err;
   }
 }
@@ -194,14 +225,14 @@ export const handler = (async (event) => {
       ?? (event.body ? (() => { try { return JSON.parse(event.body).action; } catch { return null; } })() : null);
 
     if (timerAction === 'send_reminders') {
-      const driver = await getDriver();
       const now = new Date();
+
       const tomorrowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
       const tomorrowEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 2, 0, 0, 0));
       const tsStart = Math.floor(tomorrowStart.getTime() / 1000);
       const tsEnd   = Math.floor(tomorrowEnd.getTime() / 1000);
 
-      const rows = await driver.tableClient.withSession(async (session) => {
+      const rows = await withSession(async (session) => {
         const { resultSets } = await session.executeQuery(
           `SELECT a.id AS id, a.client_id AS client_id, a.client_name AS client_name, a.appointment_date AS appointment_date, a.status AS status, s.title AS service_title
            FROM appointments AS a
@@ -278,7 +309,6 @@ export const handler = (async (event) => {
   }
 
   try {
-    const driver = await getDriver();
     const params = event.queryStringParameters || {};
 
     // ════════════════════════════════════════
@@ -288,7 +318,7 @@ export const handler = (async (event) => {
 
       if (params.action === 'history' && params.client_id) {
         const clientId = safe(params.client_id);
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT a.id AS id, a.service_id AS service_id, a.appointment_date AS appointment_date,
              a.status AS status, a.total_price AS total_price, s.title AS title
@@ -303,7 +333,7 @@ export const handler = (async (event) => {
       }
 
       if (params.action === 'all_appointments') {
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT a.id AS id, a.client_id AS client_id, a.service_id AS service_id,
              a.appointment_date AS appointment_date, a.status AS status,
@@ -320,7 +350,7 @@ export const handler = (async (event) => {
       }
 
       if (params.action === 'all_services') {
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             'SELECT id, category, title, price, duration_minutes, is_active FROM services;'
           );
@@ -330,7 +360,7 @@ export const handler = (async (event) => {
       }
 
       if (params.action === 'availability') {
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             'SELECT id, date, start_time, end_time, is_day_off FROM availability;'
           );
@@ -340,7 +370,7 @@ export const handler = (async (event) => {
       }
 
       if (params.action === 'all_clients') {
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT a.client_id AS client_id,
              a.client_name AS client_name,
@@ -368,7 +398,7 @@ export const handler = (async (event) => {
 
       if (params.action === 'client_notes' && params.client_id) {
         const clientId = safe(params.client_id);
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT client_notes FROM appointments 
              WHERE client_id = "${clientId}" AND client_notes IS NOT NULL
@@ -386,7 +416,7 @@ export const handler = (async (event) => {
           return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'no client_id' }) };
         }
 
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT phone, telegram FROM client_profiles WHERE client_id = "${clientId}";`
           );
@@ -407,7 +437,7 @@ export const handler = (async (event) => {
 
       if (params.action === 'day_config' && params.date) {
         const dateStr = safe(params.date);
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT date, start_time, end_time, is_day_off 
              FROM availability WHERE date = "${dateStr}";`
@@ -420,7 +450,7 @@ export const handler = (async (event) => {
 
       if (params.action === 'busy_slots' && params.date) {
         const dateStr = safe(params.date);
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT a.id AS id, a.appointment_date AS appointment_date
              FROM appointments AS a
@@ -448,21 +478,46 @@ export const handler = (async (event) => {
       if (params.action === 'get_messages' && params.appointment_id) {
         const apptId = safe(params.appointment_id);
         const viewerId = params.viewer_id ? String(params.viewer_id) : '';
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
-            `SELECT id, sender_id, sender_name, text, created_at, is_read
+            `SELECT id, sender_id, sender_name, text, created_at, is_read, reply_to_id, reply_to_text
              FROM messages WHERE appointment_id = "${apptId}"
              ORDER BY created_at ASC;`
           );
           return parseResultSet(resultSets[0]);
         });
+
+        // Загрузить реакции
+        let reactionsMap = {};
+        if (rows.length > 0) {
+          const allIds = rows.map((m) => `"${m.id}"`).join(',');
+          try {
+            await withSession(async (session) => {
+              const { resultSets } = await session.executeQuery(
+                `SELECT message_id, user_id, emoji FROM reactions
+                 WHERE message_id IN (${allIds});`
+              );
+              const rRows = parseResultSet(resultSets[0]);
+              for (const r of rRows) {
+                if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = [];
+                reactionsMap[r.message_id].push({ emoji: r.emoji, user_id: r.user_id });
+              }
+            });
+          } catch {}
+        }
+
+        const messagesWithReactions = rows.map((m) => ({
+          ...m,
+          reactions: reactionsMap[m.id] || []
+        }));
+
         const unread = viewerId
-          ? rows.filter((m) => String(m.sender_id) !== viewerId && !m.is_read).length
+          ? messagesWithReactions.filter((m) => String(m.sender_id) !== viewerId && !m.is_read).length
           : 0;
         const nowTs = Math.floor(Date.now() / 1000);
         let typingUsers = [];
         try {
-          await driver.tableClient.withSession(async (session) => {
+          await withSession(async (session) => {
             const { resultSets } = await session.executeQuery(
               `SELECT user_id FROM typing_status
                WHERE room_id = "${apptId}" AND updated_at > CAST(${nowTs - 5} AS Uint32);`
@@ -476,12 +531,12 @@ export const handler = (async (event) => {
         return {
           statusCode: 200,
           headers: HEADERS,
-          body: JSON.stringify({ messages: rows, unread_count: unread, typing: typingUsers })
+          body: JSON.stringify({ messages: messagesWithReactions, unread_count: unread, typing: typingUsers })
         };
       }
 
       if (params.action === 'get_conversations') {
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT appointment_id, sender_id, sender_name, text, created_at, is_read
              FROM messages
@@ -516,7 +571,7 @@ export const handler = (async (event) => {
       }
 
       // Активные услуги для клиентов
-      const rows = await driver.tableClient.withSession(async (session) => {
+      const rows = await withSession(async (session) => {
         const { resultSets } = await session.executeQuery(
           'SELECT id, category, title, price, duration_minutes, is_active FROM services WHERE is_active = true;'
         );
@@ -547,13 +602,12 @@ export const handler = (async (event) => {
         const tsEnd   = Math.floor(tomorrowEnd.getTime() / 1000);
         console.log('[send_reminders POST] range:', tsStart, '->', tsEnd);
 
-        const rows = await driver.tableClient.withSession(async (session) => {
+        const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT a.id AS id, a.client_id AS client_id, a.client_name AS client_name, a.appointment_date AS appointment_date, s.title AS service_title
              FROM appointments AS a
              LEFT JOIN services AS s ON a.service_id = s.id
-             WHERE a.status = "confirmed" OR a.status = "pending"
-              ORDER BY a.appointment_date`
+             WHERE a.status = "confirmed" OR a.status = "pending"`
           );
           return parseResultSet(resultSets[0]);
         });
@@ -602,7 +656,7 @@ export const handler = (async (event) => {
         if (duration_minutes !== undefined) setParts.push(`duration_minutes = CAST(${Math.round(Number(duration_minutes))} AS Int32)`);
         if (is_active !== undefined)        setParts.push(`is_active = ${Boolean(is_active)}`);
         if (!setParts.length) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нечего обновлять' }) };
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(`UPDATE services SET ${setParts.join(', ')} WHERE id = "${safe(id)}";`);
         });
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
@@ -615,7 +669,7 @@ export const handler = (async (event) => {
 
         const p = Math.round(Number(price) || 0);
         const d = Math.round(Number(duration_minutes) || 0);
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `INSERT INTO services (id, category, title, price, duration_minutes, is_active)
              VALUES ("${newId}", "${safe(category)}", "${safe(title)}", CAST(${p} AS Int32), CAST(${d} AS Int32), true);`
@@ -627,7 +681,7 @@ export const handler = (async (event) => {
       if (body.action === 'delete_service') {
         const { id } = body;
         if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(`DELETE FROM services WHERE id = "${safe(id)}";`);
         });
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
@@ -636,7 +690,7 @@ export const handler = (async (event) => {
       if (body.action === 'save_client_notes') {
         const { client_id, notes } = body;
         if (!client_id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен client_id' }) };
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `UPDATE appointments SET client_notes = "${safe(notes)}"
              WHERE client_id = "${safe(client_id)}";`
@@ -651,7 +705,7 @@ export const handler = (async (event) => {
           return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'no client_id' }) };
         }
 
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `UPSERT INTO client_profiles (client_id, phone, telegram, updated_at)
              VALUES ("${safe(client_id)}", "${safe(phone)}", "${safe(telegram)}", CurrentUtcDatetime());`
@@ -667,7 +721,7 @@ export const handler = (async (event) => {
         if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
 
         // Получаем данные записи ДО обновления
-        const apptRows = await driver.tableClient.withSession(async (session) => {
+        const apptRows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT a.client_id AS client_id, a.client_name AS client_name,
              a.appointment_date AS appointment_date, s.title AS title, a.total_price AS total_price
@@ -679,7 +733,7 @@ export const handler = (async (event) => {
         });
 
         const now = new Date().toISOString().split('.')[0] + 'Z';
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `UPDATE appointments SET status = "confirmed", confirmed_at = CAST("${now}" AS Datetime)
              WHERE id = "${safe(id)}";`
@@ -687,7 +741,7 @@ export const handler = (async (event) => {
         });
 
         if (comment) {
-          await driver.tableClient.withSession(async (session) => {
+          await withSession(async (session) => {
             await session.executeQuery(
               `UPDATE appointments SET notes = "${safe(comment)}" WHERE id = "${safe(id)}";`
             );
@@ -716,7 +770,7 @@ export const handler = (async (event) => {
 
 
         // Получаем данные записи ДО обновления
-        const apptRows = await driver.tableClient.withSession(async (session) => {
+        const apptRows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT a.client_id AS client_id, a.appointment_date AS appointment_date, s.title AS title
              FROM appointments AS a
@@ -726,12 +780,12 @@ export const handler = (async (event) => {
           return parseResultSet(resultSets[0]);
         });
 
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(`UPDATE appointments SET status = "cancelled" WHERE id = "${safe(id)}";`);
         });
 
         if (comment) {
-          await driver.tableClient.withSession(async (session) => {
+          await withSession(async (session) => {
             await session.executeQuery(
               `UPDATE appointments SET notes = "${safe(comment)}" WHERE id = "${safe(id)}";`
             );
@@ -759,7 +813,7 @@ export const handler = (async (event) => {
         if (!id) {
           return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'no id' }) };
         }
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `DELETE FROM appointments WHERE id = "${safe(id)}";`
           );
@@ -771,11 +825,11 @@ export const handler = (async (event) => {
         const { id, comment } = body;
 
         if (!id) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужен id' }) };
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(`UPDATE appointments SET status = "completed" WHERE id = "${safe(id)}";`);
         });
         if (comment) {
-          await driver.tableClient.withSession(async (session) => {
+          await withSession(async (session) => {
             await session.executeQuery(
               `UPDATE appointments SET notes = "${safe(comment)}" WHERE id = "${safe(id)}";`
             );
@@ -792,7 +846,7 @@ export const handler = (async (event) => {
         }
 
         // Берём данные старой записи
-        const apptRows = await driver.tableClient.withSession(async (session) => {
+        const apptRows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
             `SELECT a.client_id AS client_id, a.client_name AS client_name,
              a.service_id AS service_id, a.total_price AS total_price, s.title AS title
@@ -807,14 +861,14 @@ export const handler = (async (event) => {
         if (!old) return { statusCode: 404, headers: HEADERS, body: JSON.stringify({ error: 'Запись не найдена' }) };
 
         // Отменяем старую
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(`UPDATE appointments SET status = "cancelled" WHERE id = "${safe(id)}";`);
         });
 
         // Создаём новую pending
         const newId   = `appt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const newDate = `${safe(new_date)}T${safe(new_time)}:00Z`;
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `INSERT INTO appointments (id, client_id, service_id, appointment_date, status, total_price, client_name)
              VALUES ("${newId}", "${safe(String(old.client_id))}", "${safe(String(old.service_id))}",
@@ -831,7 +885,7 @@ export const handler = (async (event) => {
             `↺ Предложение о переносе записи\n\n` +
             `💅 Услуга: ${old.title || '—'}\n` +
             `📅 Новая дата: ${formatDateRu(newTs)} в ${safe(new_time)}\n\n` +
-            `Если вас устраивает — ждём! Если нет — напишите нам 💬`
+            `Если вас устраивает — ждём! Если нет — напишите нам.`
           ).catch(() => {});
         }
 
@@ -847,7 +901,7 @@ export const handler = (async (event) => {
         const aDate = `${safe(date)}T${safe(time)}:00Z`;
         const price = Math.round(Number(total_price) || 0);
         const manualClientId = manual_client_id || `manual_${Date.now()}`;
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `INSERT INTO appointments (id, client_id, service_id, appointment_date, status, total_price, client_name, client_phone, notes)
              VALUES (
@@ -869,7 +923,7 @@ export const handler = (async (event) => {
         if (!date) return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужна date' }) };
         const id = `avail_${safe(date)}`;
 
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `UPSERT INTO availability (id, date, start_time, end_time, is_day_off)
              VALUES ("${id}", "${safe(date)}", "${safe(start_time || '10:00')}", "${safe(end_time || '20:00')}", ${Boolean(is_day_off)});`
@@ -879,25 +933,26 @@ export const handler = (async (event) => {
       }
 
       if (body.action === 'send_message') {
-        const { appointment_id, sender_id, sender_name, text } = body;
+        const { appointment_id, sender_id, sender_name, text, reply_to_id, reply_to_text } = body;
 
         if (!appointment_id || !sender_id || !text) {
           return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны appointment_id, sender_id, text' }) };
         }
         const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const nowStr = new Date().toISOString().split('.')[0] + 'Z';
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
-            `INSERT INTO messages (id, appointment_id, sender_id, sender_name, text, created_at, is_read)
+            `INSERT INTO messages (id, appointment_id, sender_id, sender_name, text, created_at, is_read, reply_to_id, reply_to_text)
              VALUES ("${msgId}", "${safe(appointment_id)}", "${safe(String(sender_id))}",
              "${safe(sender_name || '')}", "${safe(text)}",
-             CAST("${nowStr}" AS Datetime), false);`
+             CAST("${nowStr}" AS Datetime), false,
+             "${safe(reply_to_id || '')}", "${safe(reply_to_text || '')}");`
           );
         });
 
         const isMasterSender = MASTER_IDS.includes(String(sender_id));
         if (isMasterSender) {
-          const apptRows = await driver.tableClient.withSession(async (session) => {
+          const apptRows = await withSession(async (session) => {
             const { resultSets } = await session.executeQuery(
               `SELECT client_id FROM appointments WHERE id = "${safe(appointment_id)}";`
             );
@@ -917,13 +972,41 @@ export const handler = (async (event) => {
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, id: msgId }) };
       }
 
+      if (body.action === 'add_reaction') {
+        const { message_id, user_id, emoji } = body;
+        if (!message_id || !user_id || !emoji) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'missing fields' }) };
+        }
+        await withSession(async (session) => {
+          await session.executeQuery(
+            `UPSERT INTO reactions (message_id, user_id, emoji)
+             VALUES ("${safe(message_id)}", "${safe(String(user_id))}", "${safe(emoji)}");`
+          );
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
+      if (body.action === 'remove_reaction') {
+        const { message_id, user_id } = body;
+        if (!message_id || !user_id) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'missing fields' }) };
+        }
+        await withSession(async (session) => {
+          await session.executeQuery(
+            `DELETE FROM reactions WHERE message_id = "${safe(message_id)}"
+             AND user_id = "${safe(String(user_id))}";`
+          );
+        });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      }
+
       if (body.action === 'set_typing') {
         const { room_id, user_id } = body;
         if (!room_id || !user_id) {
           return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'missing fields' }) };
         }
         const nowTs = Math.floor(Date.now() / 1000);
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `UPSERT INTO typing_status (room_id, user_id, updated_at)
              VALUES ("${safe(room_id)}", "${safe(user_id)}", CAST(${nowTs} AS Uint32));`
@@ -937,7 +1020,7 @@ export const handler = (async (event) => {
         if (!appointment_id || !viewer_id) {
           return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны appointment_id, viewer_id' }) };
         }
-        await driver.tableClient.withSession(async (session) => {
+        await withSession(async (session) => {
           await session.executeQuery(
             `UPDATE messages SET is_read = true
              WHERE appointment_id = "${safe(appointment_id)}"
@@ -952,7 +1035,7 @@ export const handler = (async (event) => {
         return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны service_id, client_id, date' }) };
       }
       const id = `appt_${Date.now()}`;
-      await driver.tableClient.withSession(async (session) => {
+      await withSession(async (session) => {
         await session.executeQuery(
           `INSERT INTO appointments (id, client_id, service_id, appointment_date, status, total_price, client_name, client_phone, notes)
            VALUES (
@@ -976,7 +1059,7 @@ export const handler = (async (event) => {
         price: Number(totalPrice) || 0,
         appointment_id: id
       }).replace(/"/g, '\\"');
-      await driver.tableClient.withSession(async (session) => {
+      await withSession(async (session) => {
         await session.executeQuery(
           `INSERT INTO messages (id, appointment_id, sender_id, sender_name, text, created_at, is_read)
            VALUES ("msg_card_${id}", "${chatRoom}", "natasha_system", "Natasha Lab",

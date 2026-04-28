@@ -259,6 +259,22 @@ export const handler = (async (event) => {
         return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: s3err.message }) };
       }
     }
+
+    if (_earlyBody.action === 'upload_audio') {
+      const { audio_base64, appointment_id } = _earlyBody;
+      if (!audio_base64 || !appointment_id) {
+        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны audio_base64, appointment_id' }) };
+      }
+      try {
+        const buf = Buffer.from(audio_base64, 'base64');
+        const objKey = `audio/${safe(appointment_id)}/${Date.now()}.webm`;
+        const url = await uploadToS3(buf, objKey, 'audio/webm');
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, url }) };
+      } catch (s3err) {
+        console.error('S3 upload error:', s3err.message);
+        return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: s3err.message }) };
+      }
+    }
   }
 
   try {

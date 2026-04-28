@@ -36,6 +36,18 @@ function IconCamera() {
   );
 }
 
+function IconMic({ active }) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+      stroke={active ? '#FF3B30' : 'currentColor'}
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="2" width="6" height="11" rx="3" />
+      <path d="M19 10a7 7 0 0 1-14 0" />
+      <path d="M12 19v3M8 22h8" />
+    </svg>
+  );
+}
+
 function IconSend() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
@@ -79,6 +91,98 @@ function BookingCard({ raw }) {
   );
 }
 
+function AudioBubble({ url }) {
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef(null);
+
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      audio.play()?.then(() => setPlaying(true)).catch(() => setPlaying(false));
+    }
+  };
+
+  const formatTime = (sec) => {
+    if (!Number.isFinite(sec) || sec < 0) return '00:00';
+    const minutes = Math.floor(sec / 60).toString().padStart(2, '0');
+    const seconds = Math.floor(sec % 60).toString().padStart(2, '0');
+    return `${minutes}:${seconds}`;
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 180 }}>
+      <audio
+        ref={audioRef}
+        src={url}
+        onTimeUpdate={(e) => {
+          const current = e.target.currentTime;
+          const total = e.target.duration || 1;
+          setProgress(Math.min(current / total, 1));
+        }}
+        onLoadedMetadata={(e) => setDuration(e.target.duration || 0)}
+        onEnded={() => {
+          setPlaying(false);
+          setProgress(0);
+        }}
+      />
+      <motion.button
+        type="button"
+        onClick={toggle}
+        whileTap={{ scale: 0.88 }}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.15)',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'rgba(237,244,255,0.9)',
+          flexShrink: 0
+        }}
+      >
+        {playing ? (
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <rect x="6" y="5" width="4" height="14" />
+            <rect x="14" y="5" width="4" height="14" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M8 5l11 7-11 7V5z" />
+          </svg>
+        )}
+      </motion.button>
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 3,
+          background: 'rgba(255,255,255,0.15)',
+          borderRadius: 2,
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            height: '100%',
+            borderRadius: 2,
+            background: 'rgba(140,200,255,0.7)',
+            width: `${progress * 100}%`,
+            transition: 'width 0.1s'
+          }} />
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(140,200,255,0.5)', marginTop: 3 }}>
+          {playing ? formatTime(audioRef.current?.currentTime || 0) : formatTime(duration)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const EMOJIS = [
   '😊','❤️','💅','✨','🌸','💕','👍','🙏','🔥','😍',
   '💖','🥰','😘','💋','🌺','🌷','💐','🎀','👏','🫶',
@@ -97,6 +201,11 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const inputRef = useRef(null);
   const typingRef = useRef(0);
   const prevCountRef = useRef(null);
+  const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
 
   const load = async () => {
     if (!appointmentId) return;
@@ -223,6 +332,119 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     e.target.value = '';
   };
 
+  const sendAudio = async (blob) => {
+    setSending(true);
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result.split(',')[1]);
+          } else {
+            reject(new Error('no audio data'));
+          }
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      const uploadRes = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upload_audio', audio_base64: base64, appointment_id: appointmentId })
+      });
+      const { url } = await uploadRes.json();
+      if (url) {
+        await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'send_message',
+            appointment_id: appointmentId,
+            sender_id: currentUserId,
+            sender_name: currentUserName,
+            text: `[audio]${url}`
+          })
+        });
+        await load();
+      }
+    } catch {}
+    setSending(false);
+  };
+
+  const startRecording = async () => {
+    if (recording || !navigator?.mediaDevices?.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+      recorder.onstop = async () => {
+        const chunks = [...audioChunksRef.current];
+        audioChunksRef.current = [];
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        if (!chunks.length) return;
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        await sendAudio(blob);
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setRecording(true);
+      setRecordingTime(0);
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((t) => t + 1);
+      }, 1000);
+      haptic.medium?.();
+    } catch {}
+  };
+
+  const stopRecording = () => {
+    if (!mediaRecorderRef.current) return;
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    try {
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    } catch {}
+    setRecording(false);
+    setRecordingTime(0);
+  };
+
+  const cancelRecording = () => {
+    if (!mediaRecorderRef.current && !recordingTimerRef.current) {
+      setRecording(false);
+      setRecordingTime(0);
+      return;
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current) {
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stream?.getTracks().forEach((track) => track.stop());
+      try {
+        if (mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch {}
+      mediaRecorderRef.current = null;
+    }
+    setRecording(false);
+    setRecordingTime(0);
+  };
+
   const handleKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -273,6 +495,24 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
 
   const displayName = contactName || 'Чат';
   const hasText = text.trim().length > 0;
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = null;
+        try {
+          if (mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+          }
+        } catch {}
+        mediaRecorderRef.current.stream?.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -363,7 +603,11 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                             className={styles.bubbleImage}
                             onClick={() => setLightboxUrl(m.text.replace('[photo]', ''))}
                           />
-                        ) : m.text}
+                        ) : m.text?.startsWith('[audio]') ? (
+                          <AudioBubble url={m.text.replace('[audio]', '')} />
+                        ) : (
+                          m.text
+                        )}
                       </div>
                       <div className={`${styles.metaRow} ${isOwn ? styles.metaRowOwn : ''}`}>
                         <span className={styles.timestamp}>{formatTs(m.created_at)}</span>
@@ -443,30 +687,76 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             >
               <IconSmile />
             </motion.button>
-            <label className={styles.iconButton}>
-              <IconCamera />
-              <input type="file" accept="image/*" className={styles.fileInput} onChange={sendPhoto} />
-            </label>
-            <textarea
-              ref={inputRef}
-              value={text}
-              onChange={handleTextChange}
-              onKeyDown={handleKey}
-              placeholder="Написать..."
-              rows={1}
-              className={styles.textarea}
-            />
-            <motion.button
-              type="button"
-              onClick={send}
-              disabled={sending || !hasText}
-              className={`${styles.sendButton} ${hasText ? styles.sendButtonActive : ''}`}
-              whileTap={{ scale: 0.88 }}
-              animate={hasText ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              <IconSend />
-            </motion.button>
+            {!hasText && !recording && (
+              <label className={styles.iconButton} style={{ cursor: 'pointer' }}>
+                <input type="file" accept="image/*" className={styles.fileInput} onChange={sendPhoto} />
+                <IconCamera />
+              </label>
+            )}
+            {recording ? (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px' }}
+              >
+                <motion.div
+                  animate={{ opacity: [1, 0.3, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                  style={{ width: 8, height: 8, borderRadius: '50%', background: '#FF3B30' }}
+                />
+                <span style={{ color: 'rgba(237,244,255,0.8)', fontSize: 15 }}>
+                  {Math.floor(recordingTime / 60).toString().padStart(2, '0')}:{(recordingTime % 60).toString().padStart(2, '0')}
+                </span>
+                <span style={{ flex: 1, color: 'rgba(140,200,255,0.4)', fontSize: 13 }}>
+                  Отпустите чтобы отправить
+                </span>
+                <button type="button" onClick={cancelRecording} className={styles.iconButton}>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </motion.div>
+            ) : (
+              <textarea
+                ref={inputRef}
+                value={text}
+                onChange={handleTextChange}
+                onKeyDown={handleKey}
+                placeholder="Написать..."
+                rows={1}
+                className={styles.textarea}
+              />
+            )}
+            {hasText ? (
+              <motion.button
+                type="button"
+                onClick={send}
+                disabled={sending || !hasText}
+                className={`${styles.sendButton} ${hasText ? styles.sendButtonActive : ''}`}
+                whileTap={{ scale: 0.88 }}
+                animate={hasText ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                <IconSend />
+              </motion.button>
+            ) : (
+              <motion.button
+                type="button"
+                className={`${styles.sendButton} ${recording ? styles.sendButtonRecording : ''}`}
+                onPointerDown={startRecording}
+                onPointerUp={stopRecording}
+                onPointerLeave={cancelRecording}
+                whileTap={{ scale: 0.9 }}
+                animate={recording ? {
+                  scale: [1, 1.15, 1],
+                  boxShadow: ['0 0 0 0 rgba(255,59,48,0)', '0 0 0 12px rgba(255,59,48,0.3)', '0 0 0 0 rgba(255,59,48,0)']
+                } : {}}
+                transition={recording ? { duration: 1, repeat: Infinity } : {}}
+                disabled={sending}
+              >
+                <IconMic active={recording} />
+              </motion.button>
+            )}
           </div>
         </motion.div>
       </AnimatePresence>

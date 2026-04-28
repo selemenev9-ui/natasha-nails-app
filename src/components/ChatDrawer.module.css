@@ -393,3 +393,9 @@
   color: rgba(237, 244, 255, 0.95);
   box-shadow: 0 4px 18px rgba(20, 80, 180, 0.5);
 }
+
+.sendButtonRecording {
+  background: rgba(255, 59, 48, 0.2);
+  color: #FF3B30;
+  border: 1px solid rgba(255, 59, 48, 0.4);
+}

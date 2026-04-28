@@ -203,6 +203,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const prevCountRef = useRef(null);
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [micError, setMicError] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
@@ -402,7 +403,19 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
         setRecordingTime((t) => t + 1);
       }, 1000);
       haptic.medium?.();
-    } catch {}
+    } catch (err) {
+      if (
+        err?.name === 'NotAllowedError' ||
+        err?.name === 'PermissionDeniedError'
+      ) {
+        setMicError('Разрешите доступ к микрофону в настройках');
+      } else if (err?.name === 'NotFoundError') {
+        setMicError('Микрофон не найден');
+      } else {
+        setMicError('Не удалось начать запись');
+      }
+      setTimeout(() => setMicError(null), 3000);
+    }
   };
 
   const stopRecording = () => {
@@ -673,6 +686,27 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                     </motion.button>
                   ))}
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {micError && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(255,59,48,0.15)',
+                  borderTop: '1px solid rgba(255,59,48,0.25)',
+                  color: 'rgba(255,120,110,0.95)',
+                  fontSize: 13,
+                  textAlign: 'center',
+                  flexShrink: 0
+                }}
+              >
+                🎤 {micError}
               </motion.div>
             )}
           </AnimatePresence>

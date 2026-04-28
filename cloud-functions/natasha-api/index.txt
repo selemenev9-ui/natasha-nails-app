@@ -902,7 +902,7 @@ export const handler = (async (event) => {
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
       }
 
-      const { service_id, client_id, date, totalPrice, client_name, client_phone, notes } = body;
+      const { service_id, service_title, client_id, date, totalPrice, client_name, client_phone, notes } = body;
       if (!service_id || !client_id || !date) {
         return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны service_id, client_id, date' }) };
       }
@@ -921,7 +921,27 @@ export const handler = (async (event) => {
       notifyMasters(
         `🆕 Новая запись!\n👤 ${safe(client_name || client_id)}\n📱 ${safe(client_phone || '')}\n💅 ${safe(service_id)}\n📅 ${safe(date)}\n💰 ${Number(totalPrice) || 0} ₽`
       ).catch(() => {});
+
+      // Отправить карточку записи в чат клиента
+      const { service_title: svcTitle } = body;
+      const chatRoom = `direct_${safe(String(client_id))}`;
+      const cardJson = JSON.stringify({
+        service_title: svcTitle || service_id,
+        date,
+        price: Number(totalPrice) || 0,
+        appointment_id: id
+      }).replace(/"/g, '\\"');
+      await driver.tableClient.withSession(async (session) => {
+        await session.executeQuery(
+          `INSERT INTO messages (id, appointment_id, sender_id, sender_name, text, created_at, is_read)
+           VALUES ("msg_card_${id}", "${chatRoom}", "natasha_system", "Natasha Lab",
+           "[booking_card]${cardJson}",
+           CAST(${Math.floor(Date.now()/1000)} AS Uint32), false);`
+        );
+      }).catch(() => {});
+
       return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, appointment_id: id }) };
+
     }
 
     return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Метод не поддерживается' }) };

@@ -330,6 +330,7 @@ export default function BookingScreen({ onNavigate, onConfirmChange, preSelected
           const bookingDate = `${dateTime.date}T${dateTime.time}:00Z`;
           const body = {
             service_id: payload.service.id,
+            service_title: payload.service.title,
             client_id: user.id,
             client_name: user.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
             date: bookingDate,

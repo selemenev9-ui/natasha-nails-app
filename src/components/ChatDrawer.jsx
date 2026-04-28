@@ -46,6 +46,38 @@ function IconSend() {
   );
 }
 
+function BookingCard({ raw }) {
+  let data = {};
+  try {
+    data = JSON.parse(raw);
+  } catch {}
+  const { service_title, date, price } = data;
+  const formatted = date
+    ? new Date(date).toLocaleString('ru-RU', {
+        timeZone: 'UTC',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : '';
+  return (
+    <div className={styles.bookingCard}>
+      <div className={styles.bookingCardHeader}>
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#4CD964" strokeWidth="2" strokeLinecap="round">
+          <path d="M2 8L6 12L14 4" />
+        </svg>
+        <span>Запись создана</span>
+      </div>
+      <p className={styles.bookingCardService}>{service_title || '—'}</p>
+      <div className={styles.bookingCardMeta}>
+        <span>{formatted}</span>
+        <span>{price} ₽</span>
+      </div>
+    </div>
+  );
+}
+
 const EMOJIS = [
   '😊','❤️','💅','✨','🌸','💕','👍','🙏','🔥','😍',
   '💖','🥰','😘','💋','🌺','🌷','💐','🎀','👏','🫶',
@@ -290,7 +322,9 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                       <span className={styles.senderName}>{m.sender_name || 'Собеседник'}</span>
                     )}
                     <div className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}>
-                      {m.text?.startsWith('[photo]') ? (
+                      {m.text?.startsWith('[booking_card]') ? (
+                        <BookingCard raw={m.text.replace('[booking_card]', '')} />
+                      ) : m.text?.startsWith('[photo]') ? (
                         <img
                           src={m.text.replace('[photo]', '')}
                           alt="фото"

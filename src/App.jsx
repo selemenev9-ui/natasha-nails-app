@@ -36,12 +36,13 @@ const pageVariants = {
 };
 
 export default function App() {
-  const { isBridgeLoading, isFirstVisit, isVKEnv, completeOnboarding } = useVK();
+  const { user, isBridgeLoading, isFirstVisit, isVKEnv, completeOnboarding } = useVK();
   const [route, setRoute] = useState('profile');
   const [isConfirm, setIsConfirm] = useState(false);
   const [isSplashVisible, setIsSplashVisible] = useState(true);
   const [preSelectedService, setPreSelectedService] = useState(null);
   const [chatUnread, setChatUnread] = useState(0);
+  const [isChatDrawerOpen, setIsChatDrawerOpen] = useState(false);
   const currentScreen = route;
 
   const navigate = (next, params = {}) => {
@@ -63,29 +64,43 @@ export default function App() {
   const showSplash = isBridgeLoading || isSplashVisible;
 
   useEffect(() => {
-    if (isBridgeLoading || isFirstVisit) return;
+    if (isBridgeLoading || isFirstVisit || !user?.id) return;
     let cancelled = false;
     let intervalId;
 
     const loadUnread = () => {
-      fetch(`${API_URL}?action=get_conversations`)
+      if (cancelled || !user?.id) return;
+      if (isChatDrawerOpen) {
+        setChatUnread(0);
+        return;
+      }
+      const viewerId = String(user.id);
+      fetch(`${API_URL}?action=get_messages&appointment_id=direct_${viewerId}&viewer_id=${viewerId}`)
         .then((r) => r.json())
         .then((data) => {
           if (cancelled) return;
-          const unread = (data.conversations || []).reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
+          const messages = data.messages || [];
+          const unread = messages.filter((m) => !m.is_read && String(m.sender_id) !== viewerId).length;
           setChatUnread(unread);
         })
         .catch(() => {});
     };
 
     loadUnread();
-    intervalId = setInterval(loadUnread, 30000);
+    intervalId = setInterval(loadUnread, 10000);
 
     return () => {
       cancelled = true;
       if (intervalId) clearInterval(intervalId);
     };
-  }, [isBridgeLoading, isFirstVisit]);
+  }, [isBridgeLoading, isFirstVisit, user?.id, isChatDrawerOpen]);
+
+  const handleChatDrawerStateChange = (isOpen) => {
+    setIsChatDrawerOpen(isOpen);
+    if (isOpen) {
+      setChatUnread(0);
+    }
+  };
 
   useEffect(() => {
     if (isBridgeLoading || isFirstVisit || !isVKEnv) return;
@@ -152,7 +167,12 @@ export default function App() {
           )}
           {currentScreen === 'info' && <InfoScreen />}
           {currentScreen === 'profile' && <ProfileScreen onNavigate={navigate} />}
-          {currentScreen === 'chat' && <ChatScreen onNavigate={navigate} />}
+          {currentScreen === 'chat' && (
+            <ChatScreen
+              onNavigate={navigate}
+              onDrawerStateChange={handleChatDrawerStateChange}
+            />
+          )}
           {currentScreen === 'master' && <MasterScreen />}
         </motion.div>
       </AnimatePresence>

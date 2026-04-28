@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from '../utils/config.js';
+import { haptic } from '../utils/haptic.js';
 import styles from './ChatDrawer.module.css';
 
 // ── SVG иконки ───────────────────────────────────────────────────────────
@@ -91,9 +92,11 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const [sending, setSending] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [peerTyping, setPeerTyping] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const typingRef = useRef(0);
+  const prevCountRef = useRef(null);
 
   const load = async () => {
     if (!appointmentId) return;
@@ -124,6 +127,17 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    const prevCount = prevCountRef.current;
+    if (prevCount !== null && messages.length > prevCount) {
+      const newest = messages[messages.length - 1];
+      if (newest && String(newest.sender_id) !== String(currentUserId)) {
+        haptic.medium?.();
+      }
+    }
+    prevCountRef.current = messages.length;
+  }, [messages, currentUserId]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -261,199 +275,236 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const hasText = text.trim().length > 0;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className={styles.drawer}
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={{ type: 'spring', stiffness: 340, damping: 36 }}
-      >
-        {/* ── Header ── */}
-        <div className={styles.header}>
-          <motion.button
-            type="button"
-            onClick={onClose}
-            className={styles.backButton}
-            whileTap={{ scale: 0.88 }}
-          >
-            <IconBack />
-          </motion.button>
-          <div className={styles.avatarWrap}>
-            <div className={styles.avatar}>N</div>
-            <span className={styles.onlineDot} />
-          </div>
-          <div className={styles.headerInfo}>
-            <p className={styles.headerTitle}>{displayName}</p>
-            <p className={styles.headerSubtitle}>Онлайн</p>
-          </div>
-        </div>
-
-        {/* ── Messages ── */}
-        <div className={styles.messageList}>
-          {messages.length === 0 && (
-            <motion.div
-              className={styles.emptyState}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+    <>
+      <AnimatePresence>
+        <motion.div
+          className={styles.drawer}
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', stiffness: 340, damping: 36 }}
+        >
+          {/* ── Header ── */}
+          <div className={styles.header}>
+            <motion.button
+              type="button"
+              onClick={onClose}
+              className={styles.backButton}
+              whileTap={{ scale: 0.88 }}
             >
-              <div className={styles.emptyIcon}>
-                <svg viewBox="0 0 48 48" width="48" height="48" fill="none"
-                  stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 8h28a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H18l-8 8v-8a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4Z" />
-                  <path d="M17 21h14M17 27h8" />
-                </svg>
-              </div>
-              <p>Начните диалог</p>
-              <span>Напишите Наташе — она ответит!</span>
-            </motion.div>
-          )}
+              <IconBack />
+            </motion.button>
+            <div className={styles.avatarWrap}>
+              <div className={styles.avatar}>N</div>
+              <span className={styles.onlineDot} />
+            </div>
+            <div className={styles.headerInfo}>
+              <p className={styles.headerTitle}>{displayName}</p>
+              <p className={styles.headerSubtitle}>Онлайн</p>
+            </div>
+          </div>
 
-          <AnimatePresence initial={false}>
-            {messages.map((m, index) => {
-              const prev = messages[index - 1];
-              const curMs = m.created_at > 1e10 ? m.created_at : m.created_at * 1000;
-              const prevMs = prev?.created_at
-                ? (prev.created_at > 1e10 ? prev.created_at : prev.created_at * 1000)
-                : null;
-              const showDate = !prevMs || new Date(curMs).toDateString() !== new Date(prevMs).toDateString();
-              const isOwn = String(m.sender_id) === String(currentUserId);
+          {/* ── Messages ── */}
+          <div className={styles.messageList}>
+            {messages.length === 0 && (
+              <motion.div
+                className={styles.emptyState}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <div className={styles.emptyIcon}>
+                  <svg viewBox="0 0 48 48" width="48" height="48" fill="none"
+                    stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 8h28a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H18l-8 8v-8a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4Z" />
+                    <path d="M17 21h14M17 27h8" />
+                  </svg>
+                </div>
+                <p>Начните диалог</p>
+                <span>Напишите Наташе — она ответит!</span>
+              </motion.div>
+            )}
 
-              return (
-                <motion.div
-                  key={m.id || `${curMs}-${index}`}
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                >
-                  {showDate && (
-                    <div className={styles.dateDivider}>
-                      <span className={styles.dateLine} />
-                      <span className={styles.dateLabel}>{formatMsgDate(m.created_at)}</span>
-                      <span className={styles.dateLine} />
-                    </div>
-                  )}
-                  <div className={`${styles.messageGroup} ${isOwn ? styles.messageGroupOwn : styles.messageGroupPeer}`}>
-                    {!isOwn && (
-                      <span className={styles.senderName}>{m.sender_name || 'Собеседник'}</span>
+            <AnimatePresence initial={false}>
+              {messages.map((m, index) => {
+                const prev = messages[index - 1];
+                const curMs = m.created_at > 1e10 ? m.created_at : m.created_at * 1000;
+                const prevMs = prev?.created_at
+                  ? (prev.created_at > 1e10 ? prev.created_at : prev.created_at * 1000)
+                  : null;
+                const showDate = !prevMs || new Date(curMs).toDateString() !== new Date(prevMs).toDateString();
+                const isOwn = String(m.sender_id) === String(currentUserId);
+
+                return (
+                  <motion.div
+                    key={m.id || `${curMs}-${index}`}
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                  >
+                    {showDate && (
+                      <div className={styles.dateDivider}>
+                        <span className={styles.dateLine} />
+                        <span className={styles.dateLabel}>{formatMsgDate(m.created_at)}</span>
+                        <span className={styles.dateLine} />
+                      </div>
                     )}
-                    <div className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}>
-                      {m.text?.startsWith('[booking_card]') ? (
-                        <BookingCard raw={m.text.replace('[booking_card]', '')} />
-                      ) : m.text?.startsWith('[photo]') ? (
-                        <img
-                          src={m.text.replace('[photo]', '')}
-                          alt="фото"
-                          className={styles.bubbleImage}
-                          onClick={() => window.open(m.text.replace('[photo]', ''), '_blank')}
-                        />
-                      ) : m.text}
-                    </div>
-                    <div className={`${styles.metaRow} ${isOwn ? styles.metaRowOwn : ''}`}>
-                      <span className={styles.timestamp}>{formatTs(m.created_at)}</span>
-                      {isOwn && (
-                        <span className={`${styles.readStatus} ${m.is_read ? styles.read : styles.unread}`}>
-                          {m.is_read ? (
-                            <svg viewBox="0 0 16 10" width="16" height="10" fill="none">
-                              <path d="M1 5L5 9L11 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                              <path d="M6 5L10 9L15 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          ) : (
-                            <svg viewBox="0 0 12 10" width="12" height="10" fill="none">
-                              <path d="M1 5L5 9L11 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                        </span>
+                    <div className={`${styles.messageGroup} ${isOwn ? styles.messageGroupOwn : styles.messageGroupPeer}`}>
+                      {!isOwn && (
+                        <span className={styles.senderName}>{m.sender_name || 'Собеседник'}</span>
                       )}
+                      <div className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}>
+                        {m.text?.startsWith('[booking_card]') ? (
+                          <BookingCard raw={m.text.replace('[booking_card]', '')} />
+                        ) : m.text?.startsWith('[photo]') ? (
+                          <img
+                            src={m.text.replace('[photo]', '')}
+                            alt="фото"
+                            className={styles.bubbleImage}
+                            onClick={() => setLightboxUrl(m.text.replace('[photo]', ''))}
+                          />
+                        ) : m.text}
+                      </div>
+                      <div className={`${styles.metaRow} ${isOwn ? styles.metaRowOwn : ''}`}>
+                        <span className={styles.timestamp}>{formatTs(m.created_at)}</span>
+                        {isOwn && (
+                          <span className={`${styles.readStatus} ${m.is_read ? styles.read : styles.unread}`}>
+                            {m.is_read ? (
+                              <svg viewBox="0 0 16 10" width="16" height="10" fill="none">
+                                <path d="M1 5L5 9L11 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M6 5L10 9L15 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 12 10" width="12" height="10" fill="none">
+                                <path d="M1 5L5 9L11 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+            <AnimatePresence>
+              {peerTyping && (
+                <motion.div
+                  className={styles.typingWrap}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className={styles.typingBubble}>
+                    <span className={styles.typingDot} />
+                    <span className={styles.typingDot} />
+                    <span className={styles.typingDot} />
                   </div>
                 </motion.div>
-              );
-            })}
-          </AnimatePresence>
+              )}
+            </AnimatePresence>
+            <div ref={bottomRef} />
+          </div>
+
+          {/* ── Emoji Panel ── */}
           <AnimatePresence>
-            {peerTyping && (
+            {showEmoji && (
               <motion.div
-                className={styles.typingWrap}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 6 }}
-                transition={{ duration: 0.2 }}
+                className={styles.emojiPanel}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
               >
-                <div className={styles.typingBubble}>
-                  <span className={styles.typingDot} />
-                  <span className={styles.typingDot} />
-                  <span className={styles.typingDot} />
+                <div className={styles.emojiGrid}>
+                  {EMOJIS.map((emoji) => (
+                    <motion.button
+                      key={emoji}
+                      onClick={() => insertEmoji(emoji)}
+                      className={styles.emojiButton}
+                      whileTap={{ scale: 0.82 }}
+                    >
+                      {emoji}
+                    </motion.button>
+                  ))}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-          <div ref={bottomRef} />
-        </div>
 
-        {/* ── Emoji Panel ── */}
-        <AnimatePresence>
-          {showEmoji && (
-            <motion.div
-              className={styles.emojiPanel}
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
+          {/* ── Input Bar ── */}
+          <div className={styles.inputBar}>
+            <motion.button
+              type="button"
+              onClick={() => setShowEmoji((v) => !v)}
+              className={`${styles.iconButton} ${showEmoji ? styles.iconButtonActive : ''}`}
+              whileTap={{ scale: 0.86 }}
             >
-              <div className={styles.emojiGrid}>
-                {EMOJIS.map((emoji) => (
-                  <motion.button
-                    key={emoji}
-                    onClick={() => insertEmoji(emoji)}
-                    className={styles.emojiButton}
-                    whileTap={{ scale: 0.82 }}
-                  >
-                    {emoji}
-                  </motion.button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* ── Input Bar ── */}
-        <div className={styles.inputBar}>
-          <motion.button
-            type="button"
-            onClick={() => setShowEmoji((v) => !v)}
-            className={`${styles.iconButton} ${showEmoji ? styles.iconButtonActive : ''}`}
-            whileTap={{ scale: 0.86 }}
+              <IconSmile />
+            </motion.button>
+            <label className={styles.iconButton}>
+              <IconCamera />
+              <input type="file" accept="image/*" className={styles.fileInput} onChange={sendPhoto} />
+            </label>
+            <textarea
+              ref={inputRef}
+              value={text}
+              onChange={handleTextChange}
+              onKeyDown={handleKey}
+              placeholder="Написать..."
+              rows={1}
+              className={styles.textarea}
+            />
+            <motion.button
+              type="button"
+              onClick={send}
+              disabled={sending || !hasText}
+              className={`${styles.sendButton} ${hasText ? styles.sendButtonActive : ''}`}
+              whileTap={{ scale: 0.88 }}
+              animate={hasText ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <IconSend />
+            </motion.button>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLightboxUrl(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 300,
+              background: 'rgba(0,0,0,0.92)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(12px)'
+            }}
           >
-            <IconSmile />
-          </motion.button>
-          <label className={styles.iconButton}>
-            <IconCamera />
-            <input type="file" accept="image/*" className={styles.fileInput} onChange={sendPhoto} />
-          </label>
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={handleTextChange}
-            onKeyDown={handleKey}
-            placeholder="Написать..."
-            rows={1}
-            className={styles.textarea}
-          />
-          <motion.button
-            type="button"
-            onClick={send}
-            disabled={sending || !hasText}
-            className={`${styles.sendButton} ${hasText ? styles.sendButtonActive : ''}`}
-            whileTap={{ scale: 0.88 }}
-            animate={hasText ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <IconSend />
-          </motion.button>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+            <motion.img
+              src={lightboxUrl}
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+              style={{ maxWidth: '95vw', maxHeight: '90vh', borderRadius: 16, objectFit: 'contain' }}
+              onClick={(e) => e.stopPropagation()}
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              onDragEnd={(_, info) => {
+                if (Math.abs(info.offset.y) > 80) setLightboxUrl(null);
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

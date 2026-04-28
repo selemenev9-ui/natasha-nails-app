@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVK } from '../contexts/VKContext.jsx';
 import ChatDrawer from '../components/ChatDrawer.jsx';
+import { API_URL } from '../utils/config.js';
 import styles from './ChatScreen.module.css';
 
 function IconChevronRight() {
@@ -23,10 +24,55 @@ function IconNail() {
   );
 }
 
-export default function ChatScreen() {
+export default function ChatScreen({ onNavigate, onDrawerStateChange = () => {} }) {
   const { user } = useVK();
   const [chatOpen, setChatOpen] = useState(false);
+  const [lastMessage, setLastMessage] = useState(null);
   const chatRoomId = user?.id ? `direct_${user.id}` : null;
+
+  useEffect(() => {
+    if (!chatRoomId || !user?.id) {
+      setLastMessage(null);
+      return;
+    }
+    let cancelled = false;
+    let intervalId;
+
+    const loadLast = () => {
+      if (cancelled) return;
+      const viewerId = String(user.id);
+      fetch(`${API_URL}?action=get_messages&appointment_id=${chatRoomId}&viewer_id=${viewerId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (cancelled) return;
+          const messages = data.messages || [];
+          setLastMessage(messages.length ? messages[messages.length - 1] : null);
+        })
+        .catch(() => {});
+    };
+
+    loadLast();
+    intervalId = setInterval(loadLast, 10000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [chatRoomId, user?.id]);
+
+  useEffect(() => {
+    onDrawerStateChange(chatOpen);
+  }, [chatOpen, onDrawerStateChange]);
+
+  const renderPreview = () => {
+    if (!lastMessage) return 'Написать мастеру...';
+    const text = lastMessage.text || '';
+    if (text.startsWith('[photo]')) return '📷 Фото';
+    if (text.startsWith('[booking_card]')) return '✅ Запись создана';
+    const trimmed = text.trim();
+    if (!trimmed) return 'Написать мастеру...';
+    return trimmed.length > 35 ? `${trimmed.slice(0, 35)}…` : trimmed;
+  };
 
   return (
     <div className={styles.screen}>
@@ -49,7 +95,7 @@ export default function ChatScreen() {
           </div>
           <div className={styles.cardInfo}>
             <p className={styles.cardName}>Natasha Premium Lab</p>
-            <p className={styles.cardSub}>Написать мастеру...</p>
+            <p className={styles.cardSub}>{renderPreview()}</p>
           </div>
           <span className={styles.cardArrow}>
             <IconChevronRight />

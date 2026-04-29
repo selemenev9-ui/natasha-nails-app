@@ -458,17 +458,17 @@ export const handler = (async (event) => {
           const { resultSets: msgRS } = await session.executeQuery(
             `SELECT id, sender_id, sender_name, text, created_at, is_read, reply_to_id, reply_to_text
              FROM messages WHERE appointment_id = "${apptId}"
-             ORDER BY created_at ASC;`
+             ORDER BY created_at DESC LIMIT 100;`
           );
-          const msgs = parseResultSet(msgRS[0]);
+          const msgs = parseResultSet(msgRS[0]).reverse();
 
           let reactionsMap = {};
           if (msgs.length > 0) {
-            const allIds = msgs.map((m) => `"${m.id}"`).join(',');
+            const recentIds = msgs.slice(-30).map((m) => `"${m.id}"`).join(',');
             try {
               const { resultSets: rxRS } = await session.executeQuery(
                 `SELECT message_id, user_id, emoji FROM reactions
-                 WHERE message_id IN (${allIds});`
+                 WHERE message_id IN (${recentIds});`
               );
               const rRows = parseResultSet(rxRS[0]);
               for (const r of rRows) {

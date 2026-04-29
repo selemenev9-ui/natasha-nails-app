@@ -682,7 +682,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
-    if (delta > 55) {
+    if (delta > 40) {
       swipeReplyRef.current.triggered = true;
     }
   };
@@ -824,8 +824,9 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                       )}
                       <div
                         className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}
-                        style={m._pending ? { opacity: 0.6 } : undefined}
+                        style={{ ...(m._pending ? { opacity: 0.6 } : {}), touchAction: 'pan-y' }}
                         onPointerDown={(e) => {
+                          try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
                           handleReplyPointerDown(m, e);
                           if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
                           holdTimerRef.current = setTimeout(() => openReactionPicker(m.id, e), 500);

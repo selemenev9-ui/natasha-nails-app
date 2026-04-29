@@ -1,5 +1,5 @@
 # NATASHA NAILS APP — PROJECT BRAIN
-_Обновлено: 29.04.2026_
+_Обновлено: 29.04.2026 (сессия 2)_
 
 ## Стек
 - React + Vite, VK Mini App
@@ -35,8 +35,10 @@ _Обновлено: 29.04.2026_
 - total_price: CAST(N AS Int32)
 - package.json функции: оставить @yandex-cloud/nodejs-sdk, не удалять
 - Навигация: простой useState route в App.jsx — НЕ менять на router, сломает VK Bridge
-- **Driver YDB**: синглтон `_driver` на уровне модуля. Если `_driver` есть — возвращать сразу БЕЗ проверки ready(). НЕ делать destroy() внутри запросов. При ошибках соединения — только обнулять `_driver = null`, SDK сам переподключится на следующем запросе.
-- poolSettings: `{ minLimit: 0, maxLimit: 2 }` — жёсткий потолок сессий
+- **Driver YDB**: синглтон `cachedDriver` + `driverInitPromise` для защиты от двойной инициализации. Если `cachedDriver` есть — возвращать сразу БЕЗ проверки ready(). НЕ делать destroy(). При ошибках соединения — только обнулять `cachedDriver = null`. При RESOURCE_EXHAUSTED — НЕ сбрасывать драйвер, только ретрай.
+- poolSettings: `{ minLimit: 0, maxLimit: 1 }` — жёсткий потолок (1 сессия на инстанс)
+- `withSession(fn)`: 3 попытки с backoff (250ms × attempt) при RESOURCE_EXHAUSTED. При UNAVAILABLE/connection — сбрасывать `cachedDriver = null`.
+- 503 ответ при RESOURCE_EXHAUSTED: `{"error":"throttled","retry":true}` — фронтенд должен backoff
 - Все запросы к YDB — через `withSession(fn)`, не через `driver.tableClient.withSession` напрямую
 
 ## Object Storage (natasha-chat-media)
@@ -53,9 +55,14 @@ _Обновлено: 29.04.2026_
 ## Чат (архитектура)
 - Таблица messages в YDB
 - room_id для прямых сообщений: "direct_{client_id}"
-- Поллинг каждые **15 сек** (get_messages) — был 5 сек, увеличен из-за RESOURCE_EXHAUSTED
+- Поллинг каждые **15 сек** (get_messages) — инкрементальный с `since_ts`
+- Первый запрос (открытие чата): LIMIT 100, DESC, reverse → полная история
+- Последующие запросы: `since_ts` = lastTs, LIMIT 50, ASC → только новые
+- `lastTs` сбрасывается при смене чата и при visibilitychange (возврат на вкладку)
+- **Оптимистичный UI**: сообщение добавляется локально сразу, заменяется реальным при следующем поллинге
 - mark_read вызывается при открытии чата
 - Typing indicator: таблица typing_status, поллинг в get_messages, анимация трёх точек
+- Throttle typing updates: не чаще 1 раза в 10 сек
 - Вибрация (haptic.medium) при получении нового сообщения от собеседника
 - VK уведомление при каждом новом сообщении (send_message → sendVkMessage/notifyMasters)
 - ChatDrawer — полноэкранный, слайд справа (как VK/Telegram)
@@ -64,8 +71,9 @@ _Обновлено: 29.04.2026_
 - Аудио: кнопка 🎤 (удержание = запись, отпустить = отправить), MediaRecorder → upload_audio → [audio]url
 - AudioBubble: HTML5 audio player со своим UI (play/pause, progress bar, время)
 - Booking card: [booking_card]{json} → красивая карточка в чате
-- Бэкенд: reply_to_id/reply_to_text в messages, reactions таблица, add_reaction/remove_reaction ✅
-- Фронтенд reply и reactions: НЕ СДЕЛАНО (только бэкенд)
+- **Реакции (фронтенд + бэкенд)**: долгое нажатие на сообщение → emoji picker → add_reaction/remove_reaction → отображение под сообщением ✅
+- **Reply (фронтенд + бэкенд)**: свайп вправо на сообщение → превью над инпутом → send с reply_to_id/reply_to_text ✅
+- Свайп reply: touch-action: pan-y, setPointerCapture, threshold 40px
 
 ## Формат сообщений в чате
 - Обычный текст: просто строка
@@ -98,8 +106,15 @@ _Обновлено: 29.04.2026_
 
 ## TabBar (клиент)
 - Вкладки: Запись, Кабинет, Чат, О студии + Мастер (только MASTER_IDS)
-- Красный бейдж на Чат — поллинг get_messages каждые 30 сек, unread_count
-- При открытии вкладки Чат — сброс счётчика
+- Красный бейдж на Чат — поллинг get_messages каждые **60 сек** (был 30/10), инкрементальный с `badgeSinceTs`
+- visibilitychange: мгновенный refresh бейджа при возврате в приложение
+- При открытии вкладки Чат — сброс счётчика и `badgeSinceTs`
+
+## YDB Индексы (ОБЯЗАТЕЛЬНЫ для работы чата)
+- `messages_by_appointment`: GLOBAL ON messages (appointment_id, created_at) — индекс для get_messages
+- `reactions_by_message`: GLOBAL ON reactions (message_id) — индекс для загрузки реакций
+- Без индексов → full table scan → RESOURCE_EXHAUSTED при любой нагрузке
+- Статус: **созданы 29.04.2026**. При создании индекса YDB строит его в фоне (1-5 мин) — в этот период возможны RESOURCE_EXHAUSTED
 
 ## КЛАДБИЩЕ (не повторять!)
 - TypedData.asRows — не существует в ydb-sdk v5
@@ -110,6 +125,7 @@ _Обновлено: 29.04.2026_
 - driver.destroy() в finally — убивает соединение → RESOURCE_EXHAUSTED на следующем запросе
 - _driver.ready(1500) проверка при каждом запросе — уничтожает рабочий драйвер по IDLE-каналу → накопление зомби-сессий → RESOURCE_EXHAUSTED
 - Retry с destroy() + setTimeout(2000) внутри запроса — умножает зомби-сессии, делает хуже
+- Сброс cachedDriver = null при RESOURCE_EXHAUSTED — неправильно! Драйвер живой, проблема в YDB. Сбрасывать только при UNAVAILABLE/connection errors
 - Виндсёрф обрезает index.js при редактировании — после деплоя всегда: tail -5 index.js → должно быть };
 
 ## ЧТО СДЕЛАНО ✅
@@ -121,7 +137,7 @@ _Обновлено: 29.04.2026_
 - Отмена/перенос клиентом (если > 24ч до записи)
 - Комментарии к действиям мастера (уходят в VK)
 - Перенос записи мастером (новая pending + VK уведомление)
-- Чат: таблица messages, ChatDrawer (837 строк), ChatScreen (119 строк), ChatTab в мастер-панели
+- Чат: таблица messages, ChatDrawer, ChatScreen, ChatTab в мастер-панели
 - Telegram-like чат: разделители дат, галочки ✓/✓✓, бейджи непрочитанных
 - Полноэкранный чат (слайд справа, как VK/Telegram)
 - Emoji picker 😊 (40 эмодзи)
@@ -134,19 +150,29 @@ _Обновлено: 29.04.2026_
 - YDB: reactions таблица, reply_to_id/reply_to_text в messages, typing_status таблица
 - Бэкенд: add_reaction, remove_reaction, get_conversations, get_messages возвращает reactions
 - Бэкенд: reply_to_id/reply_to_text поддержка в send_message и get_messages
-- Driver fix: withSession wrapper, poolSettings {maxLimit:2}, без ready() на кешированном driver
-- Поллинг увеличен до 15 сек (был 5 сек)
+- **Driver fix v2**: cachedDriver + driverInitPromise синглтон, maxLimit:1, retry+backoff, 503 на throttle, НЕ сбрасывать на RESOURCE_EXHAUSTED
+- **YDB индексы**: messages_by_appointment + reactions_by_message (созданы 29.04.2026)
+- **Инкрементальный поллинг**: since_ts в get_messages, только новые сообщения, LIMIT 50
+- **Оптимистичный UI**: сообщение видно мгновенно, замена реальным при поллинге
+- **Реакции (фронтенд)**: долгое нажатие → emoji picker → toggle, отображение под сообщением
+- **Reply свайп (фронтенд)**: свайп вправо → превью → отправка с reply_to_id
+- **Бейдж**: поллинг 60 сек, инкрементальный, visibilitychange refresh
+- **Mic button fix**: убран красный индикатор после записи, исправлен pointer capture
 - ClientsTab в MasterScreen (список клиентов со сводкой, спящие клиенты)
 
 ## 🔴 НУЖНО СДЕЛАТЬ
 
-### 1. Фронтенд: Ответ на сообщение (Reply)
-Бэкенд готов (reply_to_id, reply_to_text в схеме и API).
-Нужно в ChatDrawer.jsx: свайп на сообщение → показать превью ответа над инпутом → отправить с reply_to_id/reply_to_text.
+### 1. Протестировать на телефоне: Reply и Reactions
+Реализовано в коде, но нужна проверка:
+- Свайп вправо на сообщение → появляется превью → отправка работает
+- Долгое нажатие → появляется emoji picker → реакция отображается под сообщением
+- Проверить что нет конфликта между долгим нажатием и скроллом
 
-### 2. Фронтенд: Реакции на сообщения
-Бэкенд готов (reactions таблица, add_reaction/remove_reaction).
-Нужно в ChatDrawer.jsx: долгое нажатие на сообщение → picker эмодзи → показывать реакции под сообщением.
+### 2. Протестировать стабильность чата
+После создания YDB индексов и деплоя нового бэкенда:
+- Убедиться что RESOURCE_EXHAUSTED больше не возникает при обычном использовании
+- Проверить что инкрементальный поллинг работает (новые сообщения приходят быстро)
+- Проверить что оптимистичный UI не создаёт дубли
 
 ### 3. Теги клиентов (автоматические)
 - VIP: сумма всех визитов > 10 000 ₽
@@ -162,3 +188,9 @@ _Обновлено: 29.04.2026_
 - После каждого деплоя проверять: tail -5 index.js → должно заканчиваться на };
 - При редактировании index.js — использовать targeted edits, не перезаписывать весь файл
 - НЕ трогать функции getDriver() и withSession() — они решают проблему RESOURCE_EXHAUSTED
+
+### 6. (Опционально) Уведомление мастеру при реакции клиента
+При add_reaction → send VK notification to masters (аналогично send_message)
+
+### 7. (Опционально) Счётчик сообщений в ChatTab мастера
+Сейчас ChatTab в MasterScreen не показывает бейдж непрочитанных по каждому клиенту

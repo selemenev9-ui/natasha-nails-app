@@ -204,9 +204,11 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [micError, setMicError] = useState(null);
+  const [sendError, setSendError] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const sendErrorTimerRef = useRef(null);
   const stopRequestedRef = useRef(false);
 
   const load = async () => {
@@ -271,11 +273,22 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     el.style.height = Math.min(el.scrollHeight, 100) + 'px';
   }, [text]);
 
+  const showSendError = () => {
+    setSendError('Не удалось отправить сообщение. Попробуй ещё раз');
+    if (sendErrorTimerRef.current) {
+      clearTimeout(sendErrorTimerRef.current);
+    }
+    sendErrorTimerRef.current = setTimeout(() => {
+      setSendError(null);
+      sendErrorTimerRef.current = null;
+    }, 3000);
+  };
+
   const send = async () => {
     if (!text.trim() || sending) return;
     setSending(true);
     try {
-      await fetch(API_URL, {
+      const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -286,10 +299,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           text: text.trim()
         })
       });
+      if (!res.ok) throw new Error('send_message_failed');
       setText('');
       setShowEmoji(false);
       await load();
-    } catch {}
+    } catch {
+      showSendError();
+    }
     setSending(false);
   };
 
@@ -328,9 +344,10 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           appointment_id: appointmentId
         })
       });
+      if (!uploadRes.ok) throw new Error('upload_photo_failed');
       const { url } = await uploadRes.json();
       if (url) {
-        await fetch(API_URL, {
+        const res = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -341,9 +358,12 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             text: `[photo]${url}`
           })
         });
+        if (!res.ok) throw new Error('send_photo_message_failed');
         await load();
       }
-    } catch {}
+    } catch {
+      showSendError();
+    }
     setSending(false);
     e.target.value = '';
   };
@@ -373,9 +393,10 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           content_type: mimeType || 'audio/webm'
         })
       });
+      if (!uploadRes.ok) throw new Error('upload_audio_failed');
       const { url } = await uploadRes.json();
       if (url) {
-        await fetch(API_URL, {
+        const res = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -386,9 +407,12 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             text: `[audio]${url}`
           })
         });
+        if (!res.ok) throw new Error('send_audio_message_failed');
         await load();
       }
-    } catch {}
+    } catch {
+      showSendError();
+    }
     setSending(false);
   };
 
@@ -561,6 +585,10 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
         } catch {}
         mediaRecorderRef.current.stream?.getTracks().forEach((track) => track.stop());
         mediaRecorderRef.current = null;
+      }
+      if (sendErrorTimerRef.current) {
+        clearTimeout(sendErrorTimerRef.current);
+        sendErrorTimerRef.current = null;
       }
     };
   }, []);
@@ -745,6 +773,30 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                 }}
               >
                 🎤 {micError}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {sendError && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                style={{
+                  position: 'absolute',
+                  left: 16,
+                  right: 16,
+                  bottom: 90,
+                  padding: '10px 16px',
+                  background: 'rgba(255,59,48,0.85)',
+                  borderRadius: 14,
+                  color: '#fff',
+                  fontSize: 14,
+                  boxShadow: '0 10px 30px rgba(255,59,48,0.35)'
+                }}
+              >
+                {sendError}
               </motion.div>
             )}
           </AnimatePresence>

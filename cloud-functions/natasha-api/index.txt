@@ -52,8 +52,10 @@ async function uploadToS3(buffer, key, contentType) {
 
 const endpoint  = process.env.YDB_ENDPOINT;
 const database  = process.env.YDB_DATABASE;
-const VK_TOKEN  = process.env.VK_TOKEN;
+const VK_TOKEN   = process.env.VK_TOKEN;
 const MASTER_IDS = ['80557585', '187729875']; // без тестового 123456789
+const VK_APP_ID  = process.env.VK_APP_ID || '';
+const VK_GROUP_ID = -237746914;
 
 const HEADERS = {
   'Content-Type': 'application/json',
@@ -118,8 +120,6 @@ function formatService(raw) {
   };
 }
 
-const safe = (s) => String(s || '').replace(/["'\\]/g, '');
-
 let cachedDriver = null;
 let driverInitPromise = null;
 
@@ -174,7 +174,7 @@ async function withSession(fn) {
 }
 
 // ── VK уведомления ────────────────────────────────────────────
-async function sendVkMessage(userId, message) {
+async function sendVkMessage(userId, message, keyboard) {
   if (!VK_TOKEN || !userId || userId === 'manual') return;
 
   const randomId = Math.floor(Math.random() * 1e9);
@@ -185,6 +185,8 @@ async function sendVkMessage(userId, message) {
     access_token: VK_TOKEN,
     v:            '5.131'
   });
+  if (keyboard) params.set('keyboard', keyboard);
+
   try {
     const res  = await fetch(`https://api.vk.com/method/messages.send?${params}`);
     const data = await res.json();
@@ -194,19 +196,32 @@ async function sendVkMessage(userId, message) {
   }
 }
 
-async function notifyMasters(message) {
-  await Promise.allSettled(MASTER_IDS.map(id => sendVkMessage(id, message)));
+async function notifyMasters(message, keyboard) {
+  await Promise.allSettled(MASTER_IDS.map(id => sendVkMessage(id, message, keyboard)));
 }
 
-function formatDateRu(timestamp) {
-  if (!timestamp) return '—';
-  const ms = timestamp > 1e10 ? timestamp : timestamp * 1000;
-  const d  = new Date(ms);
-  const months = ['января','февраля','марта','апреля','мая','июня',
-                  'июля','августа','сентября','октября','ноября','декабря'];
-  const hh = String(d.getUTCHours()).padStart(2,'0');
-  const mm = String(d.getUTCMinutes()).padStart(2,'0');
-  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} в ${hh}:${mm}`;
+function formatNotifText(text) {
+  const t = String(text || '');
+  if (t.startsWith('[photo]')) return '📷 Фото';
+  if (t.startsWith('[audio]')) return '🎤 Голосовое сообщение';
+  if (t.startsWith('[booking_card]')) return '✅ Запись создана';
+  const trimmed = t.trim();
+  return trimmed.length > 120 ? trimmed.slice(0, 120) + '…' : trimmed;
+}
+
+function buildAppKeyboard() {
+  if (!VK_APP_ID) return undefined;
+  return JSON.stringify({
+    one_time: true,
+    buttons: [[{
+      action: {
+        type: 'open_app',
+        app_id: Number(VK_APP_ID),
+        owner_id: VK_GROUP_ID,
+        label: '💬 Открыть чат'
+      }
+    }]]
+  });
 }
 
 // ── Handler ───────────────────────────────────────────────────
@@ -548,7 +563,7 @@ export const handler = (async (event) => {
 
         const rows = await withSession(async (session) => {
           const { resultSets } = await session.executeQuery(
-            `SELECT a.id AS id, a.client_id AS client_id, a.client_name AS client_name, a.appointment_date AS appointment_date, s.title AS service_title
+            `SELECT a.id AS id, a.client_id AS client_id, a.client_name AS client_name, a.appointment_date AS appointment_date, s.title AS title
              FROM appointments AS a
              LEFT JOIN services AS s ON a.service_id = s.id
              WHERE a.status = "confirmed" OR a.status = "pending"`
@@ -576,7 +591,7 @@ export const handler = (async (event) => {
 
           const message =
             `💅 Напоминание от Natasha Premium Lab\n\n` +
-            `Завтра вас ждёт: ${row.service_title || 'процедура'}\n` +
+            `Завтра вас ждёт: ${row.title || 'процедура'}\n` +
             `🕐 Время: ${timeStr}\n\n` +
             `Ждём вас! Если нужно перенести — напишите нам.`;
 
@@ -896,24 +911,38 @@ export const handler = (async (event) => {
         });
 
         const isMasterSender = MASTER_IDS.includes(String(sender_id));
+        const keyboard = buildAppKeyboard();
         if (isMasterSender) {
-          const apptRows = await withSession(async (session) => {
-            const { resultSets } = await session.executeQuery(
-              `SELECT client_id FROM appointments WHERE id = "${safe(appointment_id)}";`
-            );
-            return parseResultSet(resultSets[0]);
-          });
-          const clientId = apptRows[0]?.client_id || appointment_id.replace('direct_', '');
-          if (clientId && clientId !== 'manual') {
-            sendVkMessage(clientId,
-              `💬 Сообщение от мастера:\n\n${safe(text)}\n\nОткройте приложение чтобы ответить.`
+          const clientId = appointment_id.startsWith('direct_')
+            ? appointment_id.replace('direct_', '')
+            : (async () => {
+                try {
+                  const rows = await withSession(async (session) => {
+                    const { resultSets } = await session.executeQuery(
+                      `SELECT client_id FROM appointments WHERE id = "${safe(appointment_id)}" LIMIT 1;`
+                    );
+                    return parseResultSet(resultSets[0]);
+                  });
+                  return rows[0]?.client_id || null;
+                } catch {
+                  return null;
+                }
+              })();
+          const resolvedClientId = typeof clientId === 'string' ? clientId : await clientId;
+          if (resolvedClientId && resolvedClientId !== 'manual') {
+            sendVkMessage(
+              resolvedClientId,
+              `� Natasha Premium Lab\n\n${formatNotifText(text)}`,
+              keyboard
             ).catch(() => {});
           }
         } else {
           notifyMasters(
-            `💬 Сообщение от ${safe(sender_name || 'клиента')}:\n\n${safe(text)}\n\nОткройте мастер-панель чтобы ответить.`
+            `💬 ${safe(sender_name || 'Клиент')}:\n\n${formatNotifText(text)}`,
+            keyboard
           ).catch(() => {});
         }
+
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, id: msgId }) };
       }
 

@@ -123,17 +123,7 @@ const safe = (s) => String(s || '').replace(/["'\\]/g, '');
 let _driver = null;
 
 async function getDriver() {
-  if (_driver) {
-    try {
-      if (await _driver.ready(1500)) return _driver;
-    } catch {
-    }
-
-    if (typeof _driver.destroy === 'function') {
-      await _driver.destroy().catch(() => {});
-    }
-    _driver = null;
-  }
+  if (_driver) return _driver;
 
   const driver = new Driver({
     endpoint,
@@ -141,17 +131,14 @@ async function getDriver() {
     authService: getCredentialsFromEnv(),
     poolSettings: { minLimit: 0, maxLimit: 2 }
   });
-  try {
-    if (!(await driver.ready(8000))) throw new Error('YDB не ответил');
-    _driver = driver;
-    return _driver;
-  } catch (err) {
-    if (typeof driver.destroy === 'function') {
-      await driver.destroy().catch(() => {});
-    }
-    if (_driver === driver) _driver = null;
-    throw err;
+
+  if (!(await driver.ready(8000))) {
+    await driver.destroy().catch(() => {});
+    throw new Error('YDB недоступен');
   }
+
+  _driver = driver;
+  return _driver;
 }
 
 async function withSession(fn) {
@@ -160,21 +147,14 @@ async function withSession(fn) {
     return await driver.tableClient.withSession(fn);
   } catch (err) {
     const msg = err?.message || '';
-    const needRetry =
+    const isBroken =
       msg.includes('Session not found') ||
-      msg.includes('Connection dropped') ||
       msg.includes('UNAVAILABLE') ||
+      msg.includes('Connection dropped') ||
       msg.includes('RESOURCE_EXHAUSTED') ||
-      msg.includes('ResourcesExhausted') ||
-      msg.includes('session');
-    if (needRetry) {
-      if (_driver && typeof _driver.destroy === 'function') {
-        await _driver.destroy().catch(() => {});
-      }
+      msg.includes('ResourcesExhausted');
+    if (isBroken) {
       _driver = null;
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      const driver = await getDriver();
-      return await driver.tableClient.withSession(fn);
     }
     throw err;
   }

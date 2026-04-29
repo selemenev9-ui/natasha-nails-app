@@ -13,7 +13,7 @@ const CATEGORIES = [
   { id: 'extra', label: 'Дополнительно' }
 ];
 
-function ChatTab({ appointments, currentUser }) {
+function ChatTab({ appointments, currentUser, isActive }) {
   const [activeChatClient, setActiveChatClient] = useState(null);
   const [conversations, setConversations] = useState([]);
 
@@ -27,6 +27,12 @@ function ChatTab({ appointments, currentUser }) {
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
+
+  useEffect(() => {
+    if (!isActive) return undefined;
+    const interval = setInterval(loadConversations, 30000);
+    return () => clearInterval(interval);
+  }, [isActive, loadConversations]);
 
   const handleChatClose = useCallback(() => {
     setActiveChatClient(null);
@@ -1716,6 +1722,7 @@ export default function MasterScreen() {
               <ChatTab
                 appointments={appointments}
                 currentUser={user}
+                isActive={tab === 'chat'}
               />
             )}
             {tab === 'analytics' && <AnalyticsTab appointments={appointments} services={services} />}

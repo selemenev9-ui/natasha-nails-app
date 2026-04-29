@@ -244,7 +244,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, [appointmentId, currentUserId]);
 
@@ -552,7 +552,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     setText(next);
     if (!appointmentId || !currentUserId) return;
     const now = Date.now();
-    if (typingRef.current && now - typingRef.current < 1500) return;
+    if (typingRef.current && now - typingRef.current < 3000) return;
     typingRef.current = now;
     fetch(API_URL, {
       method: 'POST',
@@ -985,6 +985,33 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                 >
                   ×
                 </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── Emoji Panel ── */}
+          <AnimatePresence>
+            {showEmoji && (
+              <motion.div
+                key="emoji-panel"
+                className={styles.emojiPanel}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+              >
+                <div className={styles.emojiGrid}>
+                  {EMOJIS.map((em) => (
+                    <button
+                      key={em}
+                      type="button"
+                      className={styles.emojiButton}
+                      onClick={() => { setText((t) => t + em); setShowEmoji(false); inputRef.current?.focus(); }}
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

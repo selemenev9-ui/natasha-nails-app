@@ -609,7 +609,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     setText(next);
     if (!appointmentId || !currentUserId) return;
     const now = Date.now();
-    if (typingRef.current && now - typingRef.current < 3000) return;
+    if (typingRef.current && now - typingRef.current < 10000) return;
     typingRef.current = now;
     fetch(API_URL, {
       method: 'POST',

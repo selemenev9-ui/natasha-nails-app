@@ -226,6 +226,10 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       const viewerQuery = currentUserId ? `&viewer_id=${currentUserId}` : '';
       const sinceQuery = !forceFull && lastTsRef.current > 0 ? `&since_ts=${lastTsRef.current}` : '';
       const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}${sinceQuery}`);
+      if (res.status === 503) {
+        pollIntervalRef.current = Math.min(pollIntervalRef.current * 2, 120000);
+        return;
+      }
       if (!res.ok) throw new Error('not_ok');
       const data = await res.json();
       if (Array.isArray(data.messages)) {

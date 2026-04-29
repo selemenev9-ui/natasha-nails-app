@@ -121,35 +121,53 @@ function formatService(raw) {
 const safe = (s) => String(s || '').replace(/["'\\]/g, '');
 
 let cachedDriver = null;
+let driverInitPromise = null;
+
 async function getDriver() {
   if (cachedDriver) return cachedDriver;
-  const driver = new Driver({
-    endpoint,
-    database,
-    authService: getCredentialsFromEnv(),
-    poolSettings: { minLimit: 0, maxLimit: 4 }
-  });
-  try {
-    if (!(await driver.ready(5000))) throw new Error('YDB недоступен');
-    cachedDriver = driver;
-    return cachedDriver;
-  } catch (err) {
-    cachedDriver = null;
-    throw err;
-  }
+  if (driverInitPromise) return driverInitPromise;
+  driverInitPromise = (async () => {
+    const driver = new Driver({
+      endpoint,
+      database,
+      authService: getCredentialsFromEnv(),
+      poolSettings: { minLimit: 0, maxLimit: 1 }
+    });
+    try {
+      if (!(await driver.ready(5000))) throw new Error('YDB недоступен');
+      cachedDriver = driver;
+      return cachedDriver;
+    } catch (err) {
+      cachedDriver = null;
+      throw err;
+    } finally {
+      driverInitPromise = null;
+    }
+  })();
+  return driverInitPromise;
 }
 
 async function withSession(fn) {
   const driver = await getDriver();
-  try {
-    return await driver.tableClient.withSession(fn);
-  } catch (err) {
-    const msg = String(err?.message || err);
-    if (/RESOURCE_EXHAUSTED|UNAVAILABLE|Discovery|connection/i.test(msg)) {
-      cachedDriver = null;
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await driver.tableClient.withSession(fn);
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err?.message || err);
+      if (/RESOURCE_EXHAUSTED/i.test(msg)) {
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 250 * (attempt + 1)));
+          continue;
+        }
+      } else if (/UNAVAILABLE|Discovery|connection/i.test(msg)) {
+        cachedDriver = null;
+      }
+      throw err;
     }
-    throw err;
   }
+  throw lastErr;
 }
 
 // ── VK уведомления ────────────────────────────────────────────
@@ -1063,6 +1081,11 @@ export const handler = (async (event) => {
     return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Метод не поддерживается' }) };
 
   } catch (err) {
+    const msg = String(err?.message || err);
+    if (/RESOURCE_EXHAUSTED/i.test(msg)) {
+      console.warn('YDB throttled:', msg);
+      return { statusCode: 503, headers: HEADERS, body: JSON.stringify({ error: 'throttled', retry: true }) };
+    }
     console.error('Handler error:', err);
     return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: err.message }) };
   }

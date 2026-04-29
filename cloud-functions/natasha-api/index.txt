@@ -1016,7 +1016,7 @@ export const handler = (async (event) => {
         date,
         price: Number(totalPrice) || 0,
         appointment_id: id
-      }).replace(/"/g, '\\"');
+      }).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       await withSession(async (session) => {
         await session.executeQuery(
           `INSERT INTO messages (id, appointment_id, sender_id, sender_name, text, created_at, is_read)

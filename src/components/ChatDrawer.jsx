@@ -207,6 +207,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const stopRequestedRef = useRef(false);
 
   const load = async () => {
     if (!appointmentId) return;
@@ -219,7 +220,9 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
         setMessages(data.messages);
       }
       setPeerTyping((data.typing || []).length > 0);
-    } catch {}
+    } catch {
+      setPeerTyping(false);
+    }
   };
 
   useEffect(() => {
@@ -391,8 +394,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
 
   const startRecording = async () => {
     if (recording || !navigator?.mediaDevices?.getUserMedia) return;
+    stopRequestedRef.current = false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (stopRequestedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       const mimeType = [
         'audio/webm;codecs=opus',
         'audio/webm',
@@ -443,7 +451,12 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   };
 
   const stopRecording = () => {
-    if (!mediaRecorderRef.current) return;
+    stopRequestedRef.current = true;
+    if (!mediaRecorderRef.current) {
+      setRecording(false);
+      setRecordingTime(0);
+      return;
+    }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
@@ -458,6 +471,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   };
 
   const cancelRecording = () => {
+    stopRequestedRef.current = true;
     if (!mediaRecorderRef.current && !recordingTimerRef.current) {
       setRecording(false);
       setRecordingTime(0);
@@ -803,7 +817,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                 className={`${styles.sendButton} ${recording ? styles.sendButtonRecording : ''}`}
                 onPointerDown={startRecording}
                 onPointerUp={stopRecording}
-                onPointerLeave={cancelRecording}
+                onPointerCancel={cancelRecording}
                 whileTap={{ scale: 0.9 }}
                 animate={recording ? {
                   scale: [1, 1.15, 1],

@@ -28,11 +28,13 @@ export default function ChatScreen({ onNavigate, onDrawerStateChange = () => {} 
   const { user } = useVK();
   const [chatOpen, setChatOpen] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const chatRoomId = user?.id ? `direct_${user.id}` : null;
 
   useEffect(() => {
     if (!chatRoomId || !user?.id) {
       setLastMessage(null);
+      setUnreadCount(0);
       return;
     }
     let cancelled = false;
@@ -46,6 +48,7 @@ export default function ChatScreen({ onNavigate, onDrawerStateChange = () => {} 
           if (cancelled) return;
           const messages = data.messages || [];
           setLastMessage(messages.length ? messages[messages.length - 1] : null);
+          setUnreadCount(Number(data.unread_count) || 0);
         })
         .catch(() => {});
     };
@@ -55,10 +58,13 @@ export default function ChatScreen({ onNavigate, onDrawerStateChange = () => {} 
     return () => {
       cancelled = true;
     };
-  }, [chatRoomId, user?.id]);
+  }, [chatRoomId, user?.id, chatOpen]);
 
   useEffect(() => {
     onDrawerStateChange(chatOpen);
+    if (chatOpen) {
+      setUnreadCount(0);
+    }
   }, [chatOpen, onDrawerStateChange]);
 
   const renderPreview = () => {
@@ -90,6 +96,11 @@ export default function ChatScreen({ onNavigate, onDrawerStateChange = () => {} 
               <IconNail />
             </div>
             <span className={styles.cardOnlineDot} />
+            {unreadCount > 0 && (
+              <span className={styles.cardBadge}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </div>
           <div className={styles.cardInfo}>
             <p className={styles.cardName}>Natasha Premium Lab</p>

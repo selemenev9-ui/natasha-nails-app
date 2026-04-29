@@ -216,7 +216,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const swipeReplyRef = useRef({ active: false });
   const [reactionPicker, setReactionPicker] = useState({ messageId: null, x: 0, y: 0 });
   const holdTimerRef = useRef(null);
-  const pollIntervalRef = useRef(30000);
+  const pollIntervalRef = useRef(10000);
   const pollTimerRef = useRef(null);
   const lastTsRef = useRef(0);
 
@@ -252,7 +252,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
         }
       }
       setPeerTyping((data.typing || []).length > 0);
-      pollIntervalRef.current = 30000;
+      pollIntervalRef.current = 10000;
     } catch {
       setPeerTyping(false);
       pollIntervalRef.current = Math.min(pollIntervalRef.current * 2, 120000);
@@ -366,7 +366,6 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
         })
       });
       if (!res.ok) throw new Error('send_message_failed');
-      await load(true);
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setText(msgText);
@@ -413,7 +412,22 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       if (!uploadRes.ok) throw new Error('upload_photo_failed');
       const { url } = await uploadRes.json();
       if (url) {
-        const res = await fetch(API_URL, {
+        const tempId = `temp_${Date.now()}`;
+        const replyRef = replyTo;
+        setMessages((prev) => [...prev, {
+          id: tempId,
+          sender_id: String(currentUserId),
+          sender_name: currentUserName,
+          text: `[photo]${url}`,
+          created_at: Math.floor(Date.now() / 1000),
+          is_read: false,
+          reactions: [],
+          reply_to_id: replyRef?.id || null,
+          reply_to_text: replyRef?.text || null,
+          _pending: true
+        }]);
+        setReplyTo(null);
+        fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -422,13 +436,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             sender_id: currentUserId,
             sender_name: currentUserName,
             text: `[photo]${url}`,
-            reply_to_id: replyTo?.id || null,
-            reply_to_text: replyTo?.text || null
+            reply_to_id: replyRef?.id || null,
+            reply_to_text: replyRef?.text || null
           })
+        }).catch(() => {
+          setMessages((prev) => prev.filter((m) => m.id !== tempId));
+          showSendError();
         });
-        if (!res.ok) throw new Error('send_photo_message_failed');
-        setReplyTo(null);
-        await load();
       }
     } catch {
       showSendError();
@@ -465,7 +479,22 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       if (!uploadRes.ok) throw new Error('upload_audio_failed');
       const { url } = await uploadRes.json();
       if (url) {
-        const res = await fetch(API_URL, {
+        const tempId = `temp_${Date.now()}`;
+        const replyRef = replyTo;
+        setMessages((prev) => [...prev, {
+          id: tempId,
+          sender_id: String(currentUserId),
+          sender_name: currentUserName,
+          text: `[audio]${url}`,
+          created_at: Math.floor(Date.now() / 1000),
+          is_read: false,
+          reactions: [],
+          reply_to_id: replyRef?.id || null,
+          reply_to_text: replyRef?.text || null,
+          _pending: true
+        }]);
+        setReplyTo(null);
+        fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -474,13 +503,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             sender_id: currentUserId,
             sender_name: currentUserName,
             text: `[audio]${url}`,
-            reply_to_id: replyTo?.id || null,
-            reply_to_text: replyTo?.text || null
+            reply_to_id: replyRef?.id || null,
+            reply_to_text: replyRef?.text || null
           })
+        }).catch(() => {
+          setMessages((prev) => prev.filter((m) => m.id !== tempId));
+          showSendError();
         });
-        if (!res.ok) throw new Error('send_audio_message_failed');
-        setReplyTo(null);
-        await load();
       }
     } catch {
       showSendError();
@@ -720,7 +749,6 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
         })
       });
       closeReactionPicker();
-      await load();
     } catch {}
   };
 

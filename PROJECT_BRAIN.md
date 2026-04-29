@@ -1,11 +1,11 @@
 # NATASHA NAILS APP — PROJECT BRAIN
-_Обновлено: 23.04.2026_
+_Обновлено: 29.04.2026_
 
 ## Стек
 - React + Vite, VK Mini App
 - Yandex Cloud Functions (Node.js 22, ESM)
-- YDB Serverless (natasha-db)
-- Yandex Object Storage (natasha-chat-media) — фото в чате
+- YDB Managed (natasha-db)
+- Yandex Object Storage (natasha-chat-media) — фото и аудио в чате
 - Framer Motion
 - НЕТ Zustand — стейт через useState + VKContext
 
@@ -13,17 +13,21 @@ _Обновлено: 23.04.2026_
 - URL: https://functions.yandexcloud.net/d4eb8ife6rqecrip6jp3
 - Сервисный аккаунт: natasha-api-sa (роли: ydb.editor + storage.uploader)
 - Env: YDB_ENDPOINT, YDB_DATABASE, VK_TOKEN, VK_GROUP_ID, S3_KEY_ID, S3_SECRET
+- Таймаут Cloud Function: 40 секунд
 
 ## Схема YDB (финальная)
-- **appointments**: id, client_id, service_id, appointment_date(Datetime), status, total_price(Int32), client_name, client_phone, notes, confirmed_at
+- **appointments**: id, client_id, service_id, appointment_date(Datetime), status, total_price(Int32), client_name, client_phone, notes, confirmed_at, client_notes
 - **services**: id, category, title, price(Int32), duration_minutes(Int32), is_active(Bool)
 - **clients**: id, vk_id, first_name, phone, registered_at
+- **client_profiles**: client_id, phone, telegram
 - **availability**: id, date, start_time, end_time, is_day_off
-- **messages**: id, appointment_id, sender_id, sender_name, text, created_at(Datetime), is_read(Bool)
+- **messages**: id, appointment_id, sender_id, sender_name, text, created_at(Datetime), is_read(Bool), reply_to_id(Utf8), reply_to_text(Utf8)
+- **reactions**: message_id(Utf8), user_id(Utf8), emoji(Utf8) — PK: (message_id, user_id)
+- **typing_status**: room_id, user_id, updated_at(Uint32)
 
 ## API actions (все рабочие)
-- **GET**: history, all_appointments, all_services, availability, all_clients, busy_slots, day_config, client_notes, get_messages, get_conversations
-- **POST**: update_service, add_service, delete_service, confirm_appointment, cancel_appointment, complete_appointment, add_appointment, set_availability, reschedule_appointment, save_client_notes, send_message, mark_read, upload_photo, (default: create booking)
+- **GET**: history, all_appointments, all_services, availability, all_clients, busy_slots, day_config, client_notes, get_client_profile, get_messages, get_conversations
+- **POST**: update_service, add_service, delete_service, confirm_appointment, cancel_appointment, complete_appointment, delete_appointment, add_appointment, set_availability, reschedule_appointment, save_client_notes, save_client_profile, send_message, mark_read, upload_photo, upload_audio, add_reaction, remove_reaction, send_reminders (default: create booking)
 
 ## Критичные решения (не менять)
 - extractValue() парсит protobuf через JSON.parse(JSON.stringify(cell)) — без этого int32 читается как пустая строка
@@ -31,26 +35,43 @@ _Обновлено: 23.04.2026_
 - total_price: CAST(N AS Int32)
 - package.json функции: оставить @yandex-cloud/nodejs-sdk, не удалять
 - Навигация: простой useState route в App.jsx — НЕ менять на router, сломает VK Bridge
-- Driver YDB: использовать СИНГЛТОН (_driver на уровне модуля) — НЕ создавать новый на каждый запрос! Иначе RESOURCE_EXHAUSTED
+- **Driver YDB**: синглтон `_driver` на уровне модуля. Если `_driver` есть — возвращать сразу БЕЗ проверки ready(). НЕ делать destroy() внутри запросов. При ошибках соединения — только обнулять `_driver = null`, SDK сам переподключится на следующем запросе.
+- poolSettings: `{ minLimit: 0, maxLimit: 2 }` — жёсткий потолок сессий
+- Все запросы к YDB — через `withSession(fn)`, не через `driver.tableClient.withSession` напрямую
 
 ## Object Storage (natasha-chat-media)
 - Бакет: natasha-chat-media, регион ru-central1
 - Доступ: публичное чтение объектов
 - Lifecycle: автоудаление через 30 дней (уже настроено)
 - Endpoint: https://natasha-chat-media.storage.yandexcloud.net
-- Загрузка: через Cloud Function (upload_photo action), AWS Signature V4 (без внешних пакетов — встроенный crypto + https)
-- Сжатие на клиенте: Canvas, max 1200px, quality 0.82 → ~100-150 КБ
-- Формат сообщения с фото: text = "[photo]https://..."
+- Фото: `chat/{appointment_id}/{timestamp}.jpeg` → [photo]url
+- Аудио: `audio/{appointment_id}/{timestamp}.webm` → [audio]url
+- Загрузка через Cloud Function (upload_photo / upload_audio), AWS Signature V4 (без внешних пакетов)
+- Сжатие фото на клиенте: Canvas, max 1200px, quality 0.82 → ~100-150 КБ
+- Аудио: MediaRecorder API, audio/webm, без конвертации
 
 ## Чат (архитектура)
 - Таблица messages в YDB
 - room_id для прямых сообщений: "direct_{client_id}"
-- Поллинг каждые 5 сек (get_messages)
+- Поллинг каждые **15 сек** (get_messages) — был 5 сек, увеличен из-за RESOURCE_EXHAUSTED
 - mark_read вызывается при открытии чата
+- Typing indicator: таблица typing_status, поллинг в get_messages, анимация трёх точек
+- Вибрация (haptic.medium) при получении нового сообщения от собеседника
 - VK уведомление при каждом новом сообщении (send_message → sendVkMessage/notifyMasters)
 - ChatDrawer — полноэкранный, слайд справа (как VK/Telegram)
 - Emoji picker: 40 эмодзи, кнопка 😊
 - Фото: кнопка 📷, input type=file, сжатие → upload_photo → [photo]url
+- Аудио: кнопка 🎤 (удержание = запись, отпустить = отправить), MediaRecorder → upload_audio → [audio]url
+- AudioBubble: HTML5 audio player со своим UI (play/pause, progress bar, время)
+- Booking card: [booking_card]{json} → красивая карточка в чате
+- Бэкенд: reply_to_id/reply_to_text в messages, reactions таблица, add_reaction/remove_reaction ✅
+- Фронтенд reply и reactions: НЕ СДЕЛАНО (только бэкенд)
+
+## Формат сообщений в чате
+- Обычный текст: просто строка
+- Фото: `[photo]https://...`
+- Аудио: `[audio]https://...`
+- Booking card: `[booking_card]{"service":"...","date":"...","time":"...","price":"..."}`
 
 ## Экраны
 - Booking — услуги из API, POST запись, hasModifiers → ServiceConstructor
@@ -87,6 +108,8 @@ _Обновлено: 23.04.2026_
 - Параметризованные запросы с typeId — не работают, использовать inline CAST
 - LEFT JOIN без AS → колонки с префиксом "a.id" — всегда писать явные алиасы AS
 - driver.destroy() в finally — убивает соединение → RESOURCE_EXHAUSTED на следующем запросе
+- _driver.ready(1500) проверка при каждом запросе — уничтожает рабочий драйвер по IDLE-каналу → накопление зомби-сессий → RESOURCE_EXHAUSTED
+- Retry с destroy() + setTimeout(2000) внутри запроса — умножает зомби-сессии, делает хуже
 - Виндсёрф обрезает index.js при редактировании — после деплоя всегда: tail -5 index.js → должно быть };
 
 ## ЧТО СДЕЛАНО ✅
@@ -98,53 +121,44 @@ _Обновлено: 23.04.2026_
 - Отмена/перенос клиентом (если > 24ч до записи)
 - Комментарии к действиям мастера (уходят в VK)
 - Перенос записи мастером (новая pending + VK уведомление)
-- Чат: таблица messages, ChatDrawer, ChatScreen, ChatTab в мастер-панели
+- Чат: таблица messages, ChatDrawer (837 строк), ChatScreen (119 строк), ChatTab в мастер-панели
 - Telegram-like чат: разделители дат, галочки ✓/✓✓, бейджи непрочитанных
 - Полноэкранный чат (слайд справа, как VK/Telegram)
 - Emoji picker 😊 (40 эмодзи)
 - Фото в чате: Canvas сжатие + Object Storage (бакет настроен, lifecycle 30 дней)
+- Аудио (голосовые) в чате: MediaRecorder, upload_audio, AudioBubble компонент
+- Typing indicator: анимация трёх точек когда собеседник печатает
+- Вибрация при новом сообщении от собеседника (haptic.medium)
+- Последнее сообщение в карточке чата (ChatScreen)
 - uploadToS3 через AWS Signature V4 (без внешних зависимостей)
+- YDB: reactions таблица, reply_to_id/reply_to_text в messages, typing_status таблица
+- Бэкенд: add_reaction, remove_reaction, get_conversations, get_messages возвращает reactions
+- Бэкенд: reply_to_id/reply_to_text поддержка в send_message и get_messages
+- Driver fix: withSession wrapper, poolSettings {maxLimit:2}, без ready() на кешированном driver
+- Поллинг увеличен до 15 сек (был 5 сек)
+- ClientsTab в MasterScreen (список клиентов со сводкой, спящие клиенты)
 
-## 🔴 НУЖНО СДЕЛАТЬ (приоритет)
+## 🔴 НУЖНО СДЕЛАТЬ
 
-### 1. КРИТИЧНО — driver-синглтон в index.js (RESOURCE_EXHAUSTED fix)
-Текущая проблема: каждый запрос создаёт новый Driver → исчерпывает gRPC соединения YDB.
+### 1. Фронтенд: Ответ на сообщение (Reply)
+Бэкенд готов (reply_to_id, reply_to_text в схеме и API).
+Нужно в ChatDrawer.jsx: свайп на сообщение → показать превью ответа над инпутом → отправить с reply_to_id/reply_to_text.
 
-Заменить в index.js:
-```js
-// УДАЛИТЬ:
-async function createDriver() {
-  const driver = new Driver({...});
-  if (!(await driver.ready(7000))) throw new Error('...');
-  return driver;
-}
-
-// ДОБАВИТЬ:
-let _driver = null;
-async function getDriver() {
-  if (_driver) return _driver;
-  _driver = new Driver({ endpoint, database, authService: getCredentialsFromEnv() });
-  if (!(await _driver.ready(15000))) { _driver = null; throw new Error('YDB не ответил'); }
-  return _driver;
-}
-```
-
-В handler заменить `let driver; try { driver = await createDriver();` на `try { const driver = await getDriver();`
-
-Удалить блок: `} finally { await driver?.destroy?.(); }`
-
-В catch добавить: `_driver = null;`
-
-### 2. Проверить фото в чате
-После п.1 — отправить фото и убедиться что появляется у собеседника
+### 2. Фронтенд: Реакции на сообщения
+Бэкенд готов (reactions таблица, add_reaction/remove_reaction).
+Нужно в ChatDrawer.jsx: долгое нажатие на сообщение → picker эмодзи → показывать реакции под сообщением.
 
 ### 3. Теги клиентов (автоматические)
 - VIP: сумма всех визитов > 10 000 ₽
 - Постоянный: 3+ завершённых визита
 - Новый: менее 2 визитов
-- Показывать в карточках клиентов в мастер-панели (ChatTab + ClientsTab)
+- Показывать в карточках клиентов в ClientsTab и ChatTab
 
-### 4. Виндсёрф — важные правила работы с index.js
+### 4. Галерея фото чата
+Все фото из переписки в одном месте — сетка миниатюр, по нажатию полноэкранный просмотр.
+
+### 5. Виндсёрф — важные правила работы с index.js
 - Выбирать МОЩНУЮ модель: Claude Sonnet или GPT-4o (не medium/mini!)
 - После каждого деплоя проверять: tail -5 index.js → должно заканчиваться на };
 - При редактировании index.js — использовать targeted edits, не перезаписывать весь файл
+- НЕ трогать функции getDriver() и withSession() — они решают проблему RESOURCE_EXHAUSTED

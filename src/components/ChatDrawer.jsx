@@ -190,6 +190,8 @@ const EMOJIS = [
   '😂','🫠','🤗','😇','🥹','💃','🎉','🍀','🫐','🦋'
 ];
 
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'];
+
 export default function ChatDrawer({ appointmentId, currentUserId, currentUserName, contactName, onClose }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
@@ -212,6 +214,8 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const sendErrorTimerRef = useRef(null);
   const stopRequestedRef = useRef(false);
   const swipeReplyRef = useRef({ active: false });
+  const [reactionPicker, setReactionPicker] = useState({ messageId: null, x: 0, y: 0 });
+  const holdTimerRef = useRef(null);
 
   const load = async () => {
     if (!appointmentId) return;
@@ -622,6 +626,32 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     swipeReplyRef.current = {};
   };
 
+  const openReactionPicker = (messageId, event) => {
+    const rect = event?.currentTarget?.getBoundingClientRect();
+    const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+    const y = rect ? rect.top - 10 : window.innerHeight / 2;
+    setReactionPicker({ messageId, x, y });
+  };
+
+  const closeReactionPicker = () => setReactionPicker({ messageId: null, x: 0, y: 0 });
+
+  const handleReactionToggle = async (messageId, emoji, hasReaction) => {
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: hasReaction ? 'remove_reaction' : 'add_reaction',
+          message_id: messageId,
+          user_id: currentUserId,
+          emoji
+        })
+      });
+      closeReactionPicker();
+      await load();
+    } catch {}
+  };
+
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) {
@@ -726,11 +756,38 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                       )}
                       <div
                         className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}
-                        onPointerDown={(e) => handleReplyPointerDown(m, e)}
+                        onPointerDown={(e) => {
+                          handleReplyPointerDown(m, e);
+                          if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+                          holdTimerRef.current = setTimeout(() => openReactionPicker(m.id, e), 500);
+                        }}
                         onPointerMove={handleReplyPointerMove}
-                        onPointerUp={handleReplyPointerUp}
-                        onPointerLeave={handleReplyPointerUp}
-                        onPointerCancel={handleReplyPointerUp}
+                        onPointerUp={(e) => {
+                          handleReplyPointerUp();
+                          if (holdTimerRef.current) {
+                            clearTimeout(holdTimerRef.current);
+                            holdTimerRef.current = null;
+                          }
+                        }}
+                        onPointerLeave={() => {
+                          handleReplyPointerUp();
+                          if (holdTimerRef.current) {
+                            clearTimeout(holdTimerRef.current);
+                            holdTimerRef.current = null;
+                          }
+                        }}
+                        onPointerCancel={() => {
+                          handleReplyPointerUp();
+                          if (holdTimerRef.current) {
+                            clearTimeout(holdTimerRef.current);
+                            holdTimerRef.current = null;
+                          }
+                        }}
+                        onMouseUp={(e) => {
+                          if (!('ontouchstart' in window)) {
+                            openReactionPicker(m.id, e);
+                          }
+                        }}
                         onDoubleClick={() => startReply(m)}
                       >
                         {m.reply_to_text && (
@@ -794,6 +851,25 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                           </span>
                         )}
                       </div>
+                      {m.reactions && m.reactions.length > 0 && (
+                        <div className={styles.reactionBar}>
+                          {[...new Map(m.reactions.map((r) => [r.emoji, r])).keys()].map((emoji) => {
+                            const count = m.reactions.filter((r) => r.emoji === emoji).length;
+                            const has = m.reactions.some((r) => r.emoji === emoji && String(r.user_id) === String(currentUserId));
+                            return (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => handleReactionToggle(m.id, emoji, has)}
+                                className={`${styles.reactionPill} ${has ? styles.reactionPillActive : ''}`}
+                              >
+                                <span>{emoji}</span>
+                                <span>{count}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );
@@ -980,6 +1056,69 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             )}
           </div>
         </motion.div>
+      </AnimatePresence>
+      <AnimatePresence>
+        {reactionPicker.messageId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeReactionPicker}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 250,
+              background: 'transparent'
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'fixed',
+                left: reactionPicker.x - 120,
+                top: Math.max(reactionPicker.y - 60, 60),
+                width: 240,
+                padding: '10px 12px',
+                borderRadius: 999,
+                background: 'rgba(0,0,0,0.8)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 6
+              }}
+            >
+              {QUICK_REACTIONS.map((emoji) => {
+                const message = messages.find((msg) => msg.id === reactionPicker.messageId);
+                const hasReaction = message?.reactions?.some(
+                  (r) => r.emoji === emoji && String(r.user_id) === String(currentUserId)
+                );
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => handleReactionToggle(reactionPicker.messageId, emoji, hasReaction)}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: hasReaction ? 'rgba(255,255,255,0.2)' : 'transparent',
+                      color: '#fff',
+                      fontSize: 20,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                );
+              })}
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
       <AnimatePresence>
         {lightboxUrl && (

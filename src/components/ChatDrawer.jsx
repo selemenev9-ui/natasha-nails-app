@@ -216,20 +216,22 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const swipeReplyRef = useRef({ active: false });
   const [reactionPicker, setReactionPicker] = useState({ messageId: null, x: 0, y: 0 });
   const holdTimerRef = useRef(null);
+  const pollIntervalRef = useRef(30000);
+  const pollTimerRef = useRef(null);
 
   const load = async () => {
     if (!appointmentId) return;
     try {
       const viewerQuery = currentUserId ? `&viewer_id=${currentUserId}` : '';
       const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('not_ok');
       const data = await res.json();
-      if (Array.isArray(data.messages)) {
-        setMessages(data.messages);
-      }
+      if (Array.isArray(data.messages)) setMessages(data.messages);
       setPeerTyping((data.typing || []).length > 0);
+      pollIntervalRef.current = 30000;
     } catch {
       setPeerTyping(false);
+      pollIntervalRef.current = Math.min(pollIntervalRef.current * 2, 120000);
     }
   };
 
@@ -243,9 +245,17 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   }, [appointmentId, currentUserId]);
 
   useEffect(() => {
+    const schedule = () => {
+      pollTimerRef.current = setTimeout(async () => {
+        await load();
+        schedule();
+      }, pollIntervalRef.current);
+    };
     load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
+    schedule();
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
   }, [appointmentId, currentUserId]);
 
   useEffect(() => {

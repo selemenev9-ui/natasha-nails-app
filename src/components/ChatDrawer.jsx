@@ -606,14 +606,29 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   };
 
   const handleReplyPointerDown = (msg, event) => {
-    const clientX = typeof event?.clientX === 'number' ? event.clientX : 0;
-    swipeReplyRef.current = { startX: clientX, triggered: false, message: msg };
+    const clientX = event?.clientX ?? event?.touches?.[0]?.clientX ?? 0;
+    const clientY = event?.clientY ?? event?.touches?.[0]?.clientY ?? 0;
+    swipeReplyRef.current = { startX: clientX, startY: clientY, triggered: false, message: msg };
   };
 
   const handleReplyPointerMove = (event) => {
     if (!swipeReplyRef.current.startX) return;
-    const clientX = typeof event?.clientX === 'number' ? event.clientX : 0;
+    const clientX = event?.clientX ?? event?.touches?.[0]?.clientX ?? 0;
+    const clientY = event?.clientY ?? event?.touches?.[0]?.clientY ?? 0;
     const delta = clientX - swipeReplyRef.current.startX;
+    const deltaY = Math.abs(clientY - (swipeReplyRef.current.startY || clientY));
+    if (deltaY > 20) {
+      swipeReplyRef.current = {};
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      return;
+    }
+    if (Math.abs(delta) > 8 && holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
     if (delta > 55) {
       swipeReplyRef.current.triggered = true;
     }

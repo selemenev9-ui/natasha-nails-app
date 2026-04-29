@@ -120,42 +120,17 @@ function formatService(raw) {
 
 const safe = (s) => String(s || '').replace(/["'\\]/g, '');
 
-let _driver = null;
-
-async function getDriver() {
-  if (_driver) return _driver;
-
+async function withSession(fn) {
   const driver = new Driver({
     endpoint,
     database,
-    authService: getCredentialsFromEnv(),
-    poolSettings: { minLimit: 0, maxLimit: 2 }
+    authService: getCredentialsFromEnv()
   });
-
-  if (!(await driver.ready(8000))) {
-    await driver.destroy().catch(() => {});
-    throw new Error('YDB недоступен');
-  }
-
-  _driver = driver;
-  return _driver;
-}
-
-async function withSession(fn) {
   try {
-    const driver = await getDriver();
+    if (!(await driver.ready(5000))) throw new Error('YDB недоступен');
     return await driver.tableClient.withSession(fn);
-  } catch (err) {
-    const msg = err?.message || '';
-    const isBroken =
-      msg.includes('Session not found') ||
-      msg.includes('UNAVAILABLE') ||
-      msg.includes('Connection dropped');
-
-    if (isBroken) {
-      _driver = null;
-    }
-    throw err;
+  } finally {
+    await driver.destroy().catch(() => {});
   }
 }
 
@@ -272,14 +247,16 @@ export const handler = (async (event) => {
     }
 
     if (_earlyBody.action === 'upload_audio') {
-      const { audio_base64, appointment_id } = _earlyBody;
+      const { audio_base64, appointment_id, content_type } = _earlyBody;
       if (!audio_base64 || !appointment_id) {
         return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Нужны audio_base64, appointment_id' }) };
       }
       try {
         const buf = Buffer.from(audio_base64, 'base64');
-        const objKey = `audio/${safe(appointment_id)}/${Date.now()}.webm`;
-        const url = await uploadToS3(buf, objKey, 'audio/webm');
+        const ct = content_type || 'audio/webm';
+        const ext = ct.includes('mp4') ? 'mp4' : ct.includes('ogg') ? 'ogg' : 'webm';
+        const objKey = `audio/${safe(appointment_id)}/${Date.now()}.${ext}`;
+        const url = await uploadToS3(buf, objKey, ct);
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, url }) };
       } catch (s3err) {
         console.error('S3 upload error:', s3err.message);
@@ -538,7 +515,7 @@ export const handler = (async (event) => {
               unread_count: 0
             };
           }
-          if (!m.is_read) {
+          if (!m.is_read && !MASTER_IDS.includes(String(m.sender_id))) {
             convMap[m.appointment_id].unread_count += 1;
           }
         });
@@ -741,6 +718,7 @@ export const handler = (async (event) => {
             `Ждём вас! Если нужно перенести — напишите нам.${commentLine}`
           ).catch(() => {});
         }
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
       }
 
       // ── Отменить запись → уведомить клиента ──────────────
@@ -1044,7 +1022,7 @@ export const handler = (async (event) => {
           `INSERT INTO messages (id, appointment_id, sender_id, sender_name, text, created_at, is_read)
            VALUES ("msg_card_${id}", "${chatRoom}", "natasha_system", "Natasha Lab",
            "[booking_card]${cardJson}",
-           CAST(${Math.floor(Date.now()/1000)} AS Uint32), false);`
+           CAST("${new Date().toISOString().split('.')[0] + 'Z'}" AS Datetime), false);`
         );
       }).catch(() => {});
 
@@ -1055,7 +1033,6 @@ export const handler = (async (event) => {
     return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Метод не поддерживается' }) };
 
   } catch (err) {
-    _driver = null;
     console.error('Handler error:', err);
     return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: err.message }) };
   }

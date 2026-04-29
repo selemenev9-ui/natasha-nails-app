@@ -36,7 +36,6 @@ export default function ChatScreen({ onNavigate, onDrawerStateChange = () => {} 
       return;
     }
     let cancelled = false;
-    let intervalId;
 
     const loadLast = () => {
       if (cancelled) return;
@@ -52,11 +51,9 @@ export default function ChatScreen({ onNavigate, onDrawerStateChange = () => {} 
     };
 
     loadLast();
-    intervalId = setInterval(loadLast, 10000);
 
     return () => {
       cancelled = true;
-      if (intervalId) clearInterval(intervalId);
     };
   }, [chatRoomId, user?.id]);
 
@@ -68,6 +65,7 @@ export default function ChatScreen({ onNavigate, onDrawerStateChange = () => {} 
     if (!lastMessage) return 'Написать мастеру...';
     const text = lastMessage.text || '';
     if (text.startsWith('[photo]')) return '📷 Фото';
+    if (text.startsWith('[audio]')) return '🎤 Голосовое';
     if (text.startsWith('[booking_card]')) return '✅ Запись создана';
     const trimmed = text.trim();
     if (!trimmed) return 'Написать мастеру...';

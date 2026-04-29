@@ -247,10 +247,19 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       const newest = messages[messages.length - 1];
       if (newest && String(newest.sender_id) !== String(currentUserId)) {
         haptic.medium?.();
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'mark_read',
+            appointment_id: appointmentId,
+            viewer_id: currentUserId
+          })
+        }).catch(() => {});
       }
     }
     prevCountRef.current = messages.length;
-  }, [messages, currentUserId]);
+  }, [messages, currentUserId, appointmentId]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -336,7 +345,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     e.target.value = '';
   };
 
-  const sendAudio = async (blob) => {
+  const sendAudio = async (blob, mimeType) => {
     setSending(true);
     try {
       const base64 = await new Promise((resolve, reject) => {
@@ -354,7 +363,12 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       const uploadRes = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'upload_audio', audio_base64: base64, appointment_id: appointmentId })
+        body: JSON.stringify({
+          action: 'upload_audio',
+          audio_base64: base64,
+          appointment_id: appointmentId,
+          content_type: mimeType || 'audio/webm'
+        })
       });
       const { url } = await uploadRes.json();
       if (url) {
@@ -379,7 +393,14 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     if (recording || !navigator?.mediaDevices?.getUserMedia) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4'
+      ].find((t) => MediaRecorder.isTypeSupported(t)) || '';
+      const mediaRecorderOptions = mimeType ? { mimeType } : {};
+      const recorder = new MediaRecorder(stream, mediaRecorderOptions);
       audioChunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
@@ -392,8 +413,8 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
         stream.getTracks().forEach((track) => track.stop());
         mediaRecorderRef.current = null;
         if (!chunks.length) return;
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        await sendAudio(blob);
+        const blob = new Blob(chunks, { type: mimeType || 'audio/webm' });
+        await sendAudio(blob, mimeType);
       };
       recorder.start();
       mediaRecorderRef.current = recorder;

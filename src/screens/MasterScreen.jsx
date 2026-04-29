@@ -6,7 +6,7 @@ import { API_URL } from '../utils/config.js';
 import styles from './MasterScreen.module.css';
 import ChatDrawer from '../components/ChatDrawer.jsx';
 
-const MASTER_IDS = ['80557585', '187729875', '123456789'];
+const MASTER_IDS = ['80557585', '187729875'];
 const CATEGORIES = [
   { id: 'nails', label: 'Маникюр & Педикюр' },
   { id: 'solarium', label: 'Солярий' },
@@ -420,7 +420,7 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule,
           const hour = WORK_START + i;
           const appt = todayAppts.find(a => {
             const ms = a.appointment_date > 1e10 ? a.appointment_date : a.appointment_date * 1000;
-            return new Date(ms).getHours() === hour;
+            return new Date(ms).getUTCHours() === hour;
           });
           return (
             <div key={hour} className={styles.timeSlot}>
@@ -620,7 +620,7 @@ function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
   });
 
   const dayAppts = appointments
@@ -1758,8 +1758,8 @@ export default function MasterScreen() {
       <AnimatePresence>
         {chatAppointment && (
           <ChatDrawer
-            appointmentId={chatAppointment.id}
-            currentUserId={user?.id}
+            appointmentId={`direct_${chatAppointment.client_id}`}
+            currentUserId={String(user?.id)}
             currentUserName={user?.first_name || 'Мастер'}
             contactName={chatAppointment.client_name || `ID: ${chatAppointment.client_id}`}
             onClose={() => setChatAppointment(null)}

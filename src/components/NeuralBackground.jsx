@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 
-export default function NeuralBackground() {
+export default function NeuralBackground({ paused = false }) {
   const canvasRef = useRef(null);
+  const pausedRef = useRef(paused);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,6 +43,7 @@ export default function NeuralBackground() {
 
     function draw(ts) {
       animId = requestAnimationFrame(draw);
+      if (pausedRef.current) return;
       const delta = ts - lastFrame;
       if (delta < INTERVAL) return;
       lastFrame = ts - (delta % INTERVAL);

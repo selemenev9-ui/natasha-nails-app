@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from '../utils/config.js';
 import { haptic } from '../utils/haptic.js';
@@ -59,7 +59,7 @@ function IconSend() {
   );
 }
 
-function BookingCard({ raw }) {
+const BookingCard = memo(function BookingCard({ raw }) {
   let data = {};
   try {
     data = JSON.parse(raw);
@@ -89,9 +89,9 @@ function BookingCard({ raw }) {
       </div>
     </div>
   );
-}
+});
 
-function AudioBubble({ url }) {
+const AudioBubble = memo(function AudioBubble({ url }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -181,7 +181,7 @@ function AudioBubble({ url }) {
       </div>
     </div>
   );
-}
+});
 
 const EMOJIS = [
   '😊','❤️','💅','✨','🌸','💕','👍','🙏','🔥','😍',
@@ -219,13 +219,19 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const pollIntervalRef = useRef(10000);
   const pollTimerRef = useRef(null);
   const lastTsRef = useRef(0);
+  const hasMoreRef = useRef(false);
+  const oldestTsRef = useRef(null);
+  const isLoadingOlderRef = useRef(false);
+  const scrollContainerRef = useRef(null);
+  const isNearBottomRef = useRef(true);
 
-  const load = async (forceFull = false) => {
+  const load = async (forceFull = false, beforeTs = 0) => {
     if (!appointmentId) return;
     try {
       const viewerQuery = currentUserId ? `&viewer_id=${currentUserId}` : '';
-      const sinceQuery = !forceFull && lastTsRef.current > 0 ? `&since_ts=${lastTsRef.current}` : '';
-      const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}${sinceQuery}`);
+      const sinceQuery = !forceFull && !beforeTs && lastTsRef.current > 0 ? `&since_ts=${lastTsRef.current}` : '';
+      const beforeQuery = beforeTs > 0 ? `&before_ts=${beforeTs}` : '';
+      const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}${sinceQuery}${beforeQuery}`);
       if (res.status === 503) {
         pollIntervalRef.current = Math.min(pollIntervalRef.current * 2, 120000);
         return;
@@ -243,11 +249,21 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             const maxTs = Math.max(...data.messages.map((m) => Number(m.created_at)));
             if (maxTs > lastTsRef.current) lastTsRef.current = maxTs;
           }
+        } else if (beforeTs > 0) {
+          setMessages((prev) => [...data.messages, ...prev]);
+          if (data.messages.length > 0) {
+            const minTs = Math.min(...data.messages.map((m) => Number(m.created_at)));
+            oldestTsRef.current = minTs;
+          }
+          hasMoreRef.current = data.has_more === true;
         } else {
           setMessages(data.messages);
+          hasMoreRef.current = data.has_more === true;
           if (data.messages.length > 0) {
             const maxTs = Math.max(...data.messages.map((m) => Number(m.created_at)));
             lastTsRef.current = maxTs;
+            const minTs = Math.min(...data.messages.map((m) => Number(m.created_at)));
+            oldestTsRef.current = minTs;
           }
         }
       }
@@ -256,6 +272,19 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     } catch {
       setPeerTyping(false);
       pollIntervalRef.current = Math.min(pollIntervalRef.current * 2, 120000);
+    }
+  };
+
+  const loadOlder = async () => {
+    if (!hasMoreRef.current || isLoadingOlderRef.current || !oldestTsRef.current) return;
+    isLoadingOlderRef.current = true;
+    const container = scrollContainerRef.current;
+    const prevScrollHeight = container?.scrollHeight || 0;
+    await load(false, oldestTsRef.current);
+    isLoadingOlderRef.current = false;
+    if (container) {
+      const newScrollHeight = container.scrollHeight;
+      container.scrollTop = newScrollHeight - prevScrollHeight;
     }
   };
 
@@ -270,7 +299,9 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
 
   useEffect(() => {
     lastTsRef.current = 0;
-    pollIntervalRef.current = 30000;
+    oldestTsRef.current = null;
+    hasMoreRef.current = false;
+    pollIntervalRef.current = 10000;
     const schedule = () => {
       pollTimerRef.current = setTimeout(async () => {
         await load();
@@ -293,12 +324,32 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   }, [appointmentId, currentUserId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: isLoadingOlderRef.current ? 'auto' : 'smooth' });
+    }
   }, [messages]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 120;
+      if (scrollTop < 80 && hasMoreRef.current && !isLoadingOlderRef.current) {
+        loadOlder();
+      }
+    };
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, [appointmentId]);
 
   useEffect(() => {
     const prevCount = prevCountRef.current;
     if (prevCount !== null && messages.length > prevCount) {
+      if (isLoadingOlderRef.current) {
+        prevCountRef.current = messages.length;
+        return;
+      }
       const newest = messages[messages.length - 1];
       if (newest && String(newest.sender_id) !== String(currentUserId)) {
         haptic.medium?.();
@@ -805,7 +856,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           </div>
 
           {/* ── Messages ── */}
-          <div className={styles.messageList}>
+          <div className={styles.messageList} ref={scrollContainerRef}>
             {messages.length === 0 && (
               <motion.div
                 className={styles.emptyState}

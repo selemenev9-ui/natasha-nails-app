@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import bridge from '@vkontakte/vk-bridge';
 import { API_URL } from './utils/config.js';
 
-import BookingScreen from './screens/BookingScreen.jsx';
-import InfoScreen from './screens/InfoScreen.jsx';
 import ProfileScreen from './screens/ProfileScreen.jsx';
 import ChatScreen from './screens/ChatScreen.jsx';
-import MasterScreen from './screens/MasterScreen.jsx';
+const BookingScreen = lazy(() => import('./screens/BookingScreen.jsx'));
+const InfoScreen = lazy(() => import('./screens/InfoScreen.jsx'));
+const MasterScreen = lazy(() => import('./screens/MasterScreen.jsx'));
 import OnboardingScreen from './screens/OnboardingScreen.jsx';
 import TabBar from './components/TabBar.jsx';
 import NeuralBackground from './components/NeuralBackground.jsx';
@@ -165,7 +165,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="material" />
-      <NeuralBackground />
+      <NeuralBackground paused={isChatDrawerOpen} />
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen}
@@ -175,23 +175,25 @@ export default function App() {
           exit="exit"
           style={{ width: '100%', height: '100%' }}
         >
-          {currentScreen === 'booking' && (
-            <BookingScreen
-              onNavigate={navigate}
-              onConfirmChange={setIsConfirm}
-              preSelectedService={preSelectedService}
-              onServiceConsumed={() => setPreSelectedService(null)}
-            />
-          )}
-          {currentScreen === 'info' && <InfoScreen />}
-          {currentScreen === 'profile' && <ProfileScreen onNavigate={navigate} />}
-          {currentScreen === 'chat' && (
-            <ChatScreen
-              onNavigate={navigate}
-              onDrawerStateChange={handleChatDrawerStateChange}
-            />
-          )}
-          {currentScreen === 'master' && <MasterScreen />}
+          <Suspense fallback={null}>
+            {currentScreen === 'booking' && (
+              <BookingScreen
+                onNavigate={navigate}
+                onConfirmChange={setIsConfirm}
+                preSelectedService={preSelectedService}
+                onServiceConsumed={() => setPreSelectedService(null)}
+              />
+            )}
+            {currentScreen === 'info' && <InfoScreen />}
+            {currentScreen === 'profile' && <ProfileScreen onNavigate={navigate} />}
+            {currentScreen === 'chat' && (
+              <ChatScreen
+                onNavigate={navigate}
+                onDrawerStateChange={handleChatDrawerStateChange}
+              />
+            )}
+            {currentScreen === 'master' && <MasterScreen />}
+          </Suspense>
         </motion.div>
       </AnimatePresence>
 

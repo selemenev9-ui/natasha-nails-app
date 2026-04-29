@@ -120,17 +120,37 @@ function formatService(raw) {
 
 const safe = (s) => String(s || '').replace(/["'\\]/g, '');
 
-async function withSession(fn) {
+let cachedDriver = null;
+async function getDriver() {
+  if (cachedDriver) return cachedDriver;
   const driver = new Driver({
     endpoint,
     database,
-    authService: getCredentialsFromEnv()
+    authService: getCredentialsFromEnv(),
+    poolSettings: { minLimit: 0, maxLimit: 2 }
   });
   try {
     if (!(await driver.ready(5000))) throw new Error('YDB недоступен');
-    return await driver.tableClient.withSession(fn);
-  } finally {
+    cachedDriver = driver;
+    return cachedDriver;
+  } catch (err) {
     await driver.destroy().catch(() => {});
+    cachedDriver = null;
+    throw err;
+  }
+}
+
+async function withSession(fn) {
+  const driver = await getDriver();
+  try {
+    return await driver.tableClient.withSession(fn);
+  } catch (err) {
+    const msg = String(err?.message || err);
+    if (/RESOURCE_EXHAUSTED|UNAVAILABLE|Discovery|connection/i.test(msg)) {
+      await cachedDriver?.destroy().catch(() => {});
+      cachedDriver = null;
+    }
+    throw err;
   }
 }
 
@@ -435,62 +455,58 @@ export const handler = (async (event) => {
       if (params.action === 'get_messages' && params.appointment_id) {
         const apptId = safe(params.appointment_id);
         const viewerId = params.viewer_id ? String(params.viewer_id) : '';
-        const rows = await withSession(async (session) => {
-          const { resultSets } = await session.executeQuery(
+        const nowTs = Math.floor(Date.now() / 1000);
+        const { msgs, reactionsMap, typingUsers } = await withSession(async (session) => {
+          const { resultSets: msgRS } = await session.executeQuery(
             `SELECT id, sender_id, sender_name, text, created_at, is_read, reply_to_id, reply_to_text
              FROM messages WHERE appointment_id = "${apptId}"
              ORDER BY created_at ASC;`
           );
-          return parseResultSet(resultSets[0]);
-        });
+          const msgs = parseResultSet(msgRS[0]);
 
-        // Загрузить реакции
-        let reactionsMap = {};
-        if (rows.length > 0) {
-          const allIds = rows.map((m) => `"${m.id}"`).join(',');
-          try {
-            await withSession(async (session) => {
-              const { resultSets } = await session.executeQuery(
+          let reactionsMap = {};
+          if (msgs.length > 0) {
+            const allIds = msgs.map((m) => `"${m.id}"`).join(',');
+            try {
+              const { resultSets: rxRS } = await session.executeQuery(
                 `SELECT message_id, user_id, emoji FROM reactions
                  WHERE message_id IN (${allIds});`
               );
-              const rRows = parseResultSet(resultSets[0]);
+              const rRows = parseResultSet(rxRS[0]);
               for (const r of rRows) {
                 if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = [];
                 reactionsMap[r.message_id].push({ emoji: r.emoji, user_id: r.user_id });
               }
-            });
-          } catch {}
-        }
+            } catch {}
+          }
 
-        const messagesWithReactions = rows.map((m) => ({
-          ...m,
-          reactions: reactionsMap[m.id] || []
-        }));
-
-        const unread = viewerId
-          ? messagesWithReactions.filter((m) => String(m.sender_id) !== viewerId && !m.is_read).length
-          : 0;
-        const nowTs = Math.floor(Date.now() / 1000);
-        let typingUsers = [];
-        try {
-          await withSession(async (session) => {
-            const { resultSets } = await session.executeQuery(
+          let typingUsers = [];
+          try {
+            const { resultSets: typRS } = await session.executeQuery(
               `SELECT user_id FROM typing_status
                WHERE room_id = "${apptId}" AND updated_at > CAST(${nowTs - 5} AS Uint32);`
             );
-            const typingRows = parseResultSet(resultSets[0]);
-            typingUsers = typingRows
+            typingUsers = parseResultSet(typRS[0])
               .map((row) => String(row.user_id))
               .filter((uid) => uid && uid !== viewerId);
-          });
-        } catch {}
+          } catch {}
+
+          return { msgs, reactionsMap, typingUsers };
+        });
+
+        const messagesWithReactions = msgs.map((m) => ({
+          ...m,
+          reactions: reactionsMap[m.id] || []
+        }));
+        const unread = viewerId
+          ? messagesWithReactions.filter((m) => String(m.sender_id) !== viewerId && !m.is_read).length
+          : 0;
         return {
           statusCode: 200,
           headers: HEADERS,
           body: JSON.stringify({ messages: messagesWithReactions, unread_count: unread, typing: typingUsers })
         };
-      }
+      } 
 
       if (params.action === 'get_conversations') {
         const rows = await withSession(async (session) => {

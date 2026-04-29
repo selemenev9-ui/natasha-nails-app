@@ -150,9 +150,8 @@ async function withSession(fn) {
     const isBroken =
       msg.includes('Session not found') ||
       msg.includes('UNAVAILABLE') ||
-      msg.includes('Connection dropped') ||
-      msg.includes('RESOURCE_EXHAUSTED') ||
-      msg.includes('ResourcesExhausted');
+      msg.includes('Connection dropped');
+
     if (isBroken) {
       _driver = null;
     }

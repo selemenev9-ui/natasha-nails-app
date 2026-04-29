@@ -123,6 +123,13 @@ const safe = (s) => String(s || '').replace(/["'\\]/g, '');
 let cachedDriver = null;
 let driverInitPromise = null;
 
+process.once('SIGTERM', () => {
+  if (cachedDriver) {
+    try { cachedDriver.destroy(); } catch {}
+    cachedDriver = null;
+  }
+});
+
 async function getDriver() {
   if (cachedDriver) return cachedDriver;
   if (driverInitPromise) return driverInitPromise;
@@ -133,16 +140,9 @@ async function getDriver() {
       authService: getCredentialsFromEnv(),
       poolSettings: { minLimit: 0, maxLimit: 1 }
     });
-    try {
-      if (!(await driver.ready(5000))) throw new Error('YDB недоступен');
-      cachedDriver = driver;
-      return cachedDriver;
-    } catch (err) {
-      cachedDriver = null;
-      throw err;
-    } finally {
-      driverInitPromise = null;
-    }
+    cachedDriver = driver;
+    driverInitPromise = null;
+    return cachedDriver;
   })();
   return driverInitPromise;
 }
@@ -158,11 +158,14 @@ async function withSession(fn) {
       const msg = String(err?.message || err);
       if (/RESOURCE_EXHAUSTED/i.test(msg)) {
         if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 250 * (attempt + 1)));
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
           continue;
         }
       } else if (/UNAVAILABLE|Discovery|connection/i.test(msg)) {
-        cachedDriver = null;
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
       }
       throw err;
     }

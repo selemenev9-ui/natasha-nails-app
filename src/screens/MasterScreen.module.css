@@ -16,7 +16,7 @@
 .header { display: flex; flex-direction: column; gap: 6px; }
 .headerRow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
 .headerActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.kicker { font-size: 12px; letter-spacing: 0.25em; color: var(--ink); text-transform: uppercase; }
+.kicker { font-size: 14px; letter-spacing: 0.25em; color: var(--ink); text-transform: uppercase; }
 .title { font-size: 30px; font-weight: 700; color: var(--ink); margin: 0; }
 
 .tabsScroll {
@@ -30,7 +30,7 @@
   border: 1px solid var(--glass-border);
   background: var(--glass-medium);
   color: var(--ink-60);
-  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-size: 15px; font-weight: 600; cursor: pointer;
   white-space: nowrap; transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   flex-shrink: 0;
 }
@@ -43,7 +43,7 @@
 }
 .tabContent { display: flex; flex-direction: column; gap: 10px; }
 .groupLabel {
-  font-size: 11px; text-transform: uppercase;
+  font-size: 13px; text-transform: uppercase;
   letter-spacing: 0.15em; color: var(--ink-60);
   margin: 8px 0 2px;
 }

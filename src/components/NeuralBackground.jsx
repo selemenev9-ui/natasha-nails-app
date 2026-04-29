@@ -34,7 +34,7 @@ export default function NeuralBackground() {
           vx: rand(-0.18, 0.18),
           vy: rand(-0.18, 0.18),
           r: rand(1.2, 2.8),
-          opacity: rand(0.35, 0.75)
+          opacity: rand(0.18, 0.38)
         });
       }
     }
@@ -60,7 +60,7 @@ export default function NeuralBackground() {
           const dy = particles[i].y - particles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < MAX_DIST) {
-            const alpha = (1 - dist / MAX_DIST) * 0.25;
+            const alpha = (1 - dist / MAX_DIST) * 0.125;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
@@ -103,7 +103,7 @@ export default function NeuralBackground() {
         inset: 0,
         zIndex: 1,
         pointerEvents: 'none',
-        opacity: 0.85
+        opacity: 0.3
       }}
     />
   );

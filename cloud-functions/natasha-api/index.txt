@@ -453,18 +453,34 @@ export const handler = (async (event) => {
       if (params.action === 'get_messages' && params.appointment_id) {
         const apptId = safe(params.appointment_id);
         const viewerId = params.viewer_id ? String(params.viewer_id) : '';
+        const sinceTs = params.since_ts ? Number(params.since_ts) : 0;
+        const isIncremental = sinceTs > 0;
         const nowTs = Math.floor(Date.now() / 1000);
         const { msgs, reactionsMap, typingUsers } = await withSession(async (session) => {
-          const { resultSets: msgRS } = await session.executeQuery(
-            `SELECT id, sender_id, sender_name, text, created_at, is_read, reply_to_id, reply_to_text
-             FROM messages WHERE appointment_id = "${apptId}"
-             ORDER BY created_at DESC LIMIT 100;`
-          );
-          const msgs = parseResultSet(msgRS[0]).reverse();
+          let msgs;
+          if (isIncremental) {
+            const sinceIso = new Date(sinceTs * 1000).toISOString().split('.')[0] + 'Z';
+            const { resultSets: msgRS } = await session.executeQuery(
+              `SELECT id, sender_id, sender_name, text, created_at, is_read, reply_to_id, reply_to_text
+               FROM messages WHERE appointment_id = "${apptId}"
+                 AND created_at > CAST("${sinceIso}" AS Datetime)
+               ORDER BY created_at ASC LIMIT 50;`
+            );
+            msgs = parseResultSet(msgRS[0]);
+          } else {
+            const { resultSets: msgRS } = await session.executeQuery(
+              `SELECT id, sender_id, sender_name, text, created_at, is_read, reply_to_id, reply_to_text
+               FROM messages WHERE appointment_id = "${apptId}"
+               ORDER BY created_at DESC LIMIT 100;`
+            );
+            msgs = parseResultSet(msgRS[0]).reverse();
+          }
 
           let reactionsMap = {};
           if (msgs.length > 0) {
-            const recentIds = msgs.slice(-30).map((m) => `"${m.id}"`).join(',');
+            const recentIds = isIncremental
+              ? msgs.map((m) => `"${m.id}"`).join(',')
+              : msgs.slice(-30).map((m) => `"${m.id}"`).join(',');
             try {
               const { resultSets: rxRS } = await session.executeQuery(
                 `SELECT message_id, user_id, emoji FROM reactions
@@ -502,7 +518,7 @@ export const handler = (async (event) => {
         return {
           statusCode: 200,
           headers: HEADERS,
-          body: JSON.stringify({ messages: messagesWithReactions, unread_count: unread, typing: typingUsers })
+          body: JSON.stringify({ messages: messagesWithReactions, unread_count: unread, typing: typingUsers, incremental: isIncremental })
         };
       } 
 
@@ -512,7 +528,7 @@ export const handler = (async (event) => {
             `SELECT appointment_id, sender_id, sender_name, text, created_at, is_read
              FROM messages
              WHERE appointment_id LIKE "direct_%"
-             ORDER BY created_at DESC;`
+             ORDER BY created_at DESC LIMIT 200;`
           );
           return parseResultSet(resultSets[0]);
         });

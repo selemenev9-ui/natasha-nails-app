@@ -67,31 +67,49 @@ export default function App() {
     if (isBridgeLoading || isFirstVisit || !user?.id) return;
     let cancelled = false;
     let intervalId;
+    let badgeLastTs = 0;
 
     const loadUnread = () => {
       if (cancelled || !user?.id) return;
       if (isChatDrawerOpen) {
         setChatUnread(0);
+        badgeLastTs = 0;
         return;
       }
       const viewerId = String(user.id);
-      fetch(`${API_URL}?action=get_messages&appointment_id=direct_${viewerId}&viewer_id=${viewerId}`)
+      const sinceQ = badgeLastTs > 0 ? `&since_ts=${badgeLastTs}` : '';
+      fetch(`${API_URL}?action=get_messages&appointment_id=direct_${viewerId}&viewer_id=${viewerId}${sinceQ}`)
         .then((r) => r.json())
         .then((data) => {
           if (cancelled) return;
           const messages = data.messages || [];
-          const unread = messages.filter((m) => !m.is_read && String(m.sender_id) !== viewerId).length;
-          setChatUnread(unread);
+          if (data.incremental) {
+            if (messages.length > 0) {
+              const newUnread = messages.filter((m) => !m.is_read && String(m.sender_id) !== viewerId).length;
+              if (newUnread > 0) setChatUnread((prev) => prev + newUnread);
+              badgeLastTs = Math.max(...messages.map((m) => Number(m.created_at)));
+            }
+          } else {
+            const unread = messages.filter((m) => !m.is_read && String(m.sender_id) !== viewerId).length;
+            setChatUnread(unread);
+            if (messages.length > 0) badgeLastTs = Math.max(...messages.map((m) => Number(m.created_at)));
+          }
         })
         .catch(() => {});
     };
 
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !cancelled) loadUnread();
+    };
+
     loadUnread();
     intervalId = setInterval(loadUnread, 60000);
+    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
       cancelled = true;
       if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [isBridgeLoading, isFirstVisit, user?.id, isChatDrawerOpen]);
 

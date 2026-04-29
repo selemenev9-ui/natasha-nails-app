@@ -265,6 +265,8 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   }, [appointmentId, currentUserId]);
 
   useEffect(() => {
+    lastTsRef.current = 0;
+    pollIntervalRef.current = 30000;
     const schedule = () => {
       pollTimerRef.current = setTimeout(async () => {
         await load();
@@ -273,8 +275,16 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     };
     load();
     schedule();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+        load().then(() => schedule());
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [appointmentId, currentUserId]);
 

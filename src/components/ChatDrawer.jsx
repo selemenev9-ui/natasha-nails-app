@@ -218,15 +218,35 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const holdTimerRef = useRef(null);
   const pollIntervalRef = useRef(30000);
   const pollTimerRef = useRef(null);
+  const lastTsRef = useRef(0);
 
-  const load = async () => {
+  const load = async (forceFull = false) => {
     if (!appointmentId) return;
     try {
       const viewerQuery = currentUserId ? `&viewer_id=${currentUserId}` : '';
-      const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}`);
+      const sinceQuery = !forceFull && lastTsRef.current > 0 ? `&since_ts=${lastTsRef.current}` : '';
+      const res = await fetch(`${API_URL}?action=get_messages&appointment_id=${appointmentId}${viewerQuery}${sinceQuery}`);
       if (!res.ok) throw new Error('not_ok');
       const data = await res.json();
-      if (Array.isArray(data.messages)) setMessages(data.messages);
+      if (Array.isArray(data.messages)) {
+        if (data.incremental) {
+          if (data.messages.length > 0) {
+            setMessages((prev) => {
+              const newIds = new Set(data.messages.map((m) => m.id));
+              const base = prev.filter((m) => !m._pending && !newIds.has(m.id));
+              return [...base, ...data.messages];
+            });
+            const maxTs = Math.max(...data.messages.map((m) => Number(m.created_at)));
+            if (maxTs > lastTsRef.current) lastTsRef.current = maxTs;
+          }
+        } else {
+          setMessages(data.messages);
+          if (data.messages.length > 0) {
+            const maxTs = Math.max(...data.messages.map((m) => Number(m.created_at)));
+            lastTsRef.current = maxTs;
+          }
+        }
+      }
       setPeerTyping((data.typing || []).length > 0);
       pollIntervalRef.current = 30000;
     } catch {
@@ -302,6 +322,20 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
 
   const send = async () => {
     if (!text.trim() || sending) return;
+    const msgText = text.trim();
+    const replyRef = replyTo;
+    const tempId = `temp_${Date.now()}`;
+    const tempMsg = {
+      id: tempId, sender_id: String(currentUserId), sender_name: currentUserName,
+      text: msgText, created_at: Math.floor(Date.now() / 1000),
+      is_read: false, reactions: [],
+      reply_to_id: replyRef?.id || null, reply_to_text: replyRef?.text || null,
+      _pending: true
+    };
+    setMessages((prev) => [...prev, tempMsg]);
+    setText('');
+    setShowEmoji(false);
+    setReplyTo(null);
     setSending(true);
     try {
       const res = await fetch(API_URL, {
@@ -312,17 +346,16 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           appointment_id: appointmentId,
           sender_id: currentUserId,
           sender_name: currentUserName,
-          text: text.trim(),
-          reply_to_id: replyTo?.id || null,
-          reply_to_text: replyTo?.text || null
+          text: msgText,
+          reply_to_id: replyRef?.id || null,
+          reply_to_text: replyRef?.text || null
         })
       });
       if (!res.ok) throw new Error('send_message_failed');
-      setText('');
-      setShowEmoji(false);
-      setReplyTo(null);
-      await load();
+      await load(true);
     } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setText(msgText);
       showSendError();
     }
     setSending(false);
@@ -781,6 +814,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                       )}
                       <div
                         className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}
+                        style={m._pending ? { opacity: 0.6 } : undefined}
                         onPointerDown={(e) => {
                           handleReplyPointerDown(m, e);
                           if (holdTimerRef.current) clearTimeout(holdTimerRef.current);

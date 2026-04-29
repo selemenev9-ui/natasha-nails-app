@@ -87,7 +87,7 @@ export default function App() {
     };
 
     loadUnread();
-    intervalId = setInterval(loadUnread, 10000);
+    intervalId = setInterval(loadUnread, 60000);
 
     return () => {
       cancelled = true;

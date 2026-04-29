@@ -205,11 +205,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const [recordingTime, setRecordingTime] = useState(0);
   const [micError, setMicError] = useState(null);
   const [sendError, setSendError] = useState(null);
+  const [replyTo, setReplyTo] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
   const sendErrorTimerRef = useRef(null);
   const stopRequestedRef = useRef(false);
+  const swipeReplyRef = useRef({ active: false });
 
   const load = async () => {
     if (!appointmentId) return;
@@ -296,12 +298,15 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           appointment_id: appointmentId,
           sender_id: currentUserId,
           sender_name: currentUserName,
-          text: text.trim()
+          text: text.trim(),
+          reply_to_id: replyTo?.id || null,
+          reply_to_text: replyTo?.text || null
         })
       });
       if (!res.ok) throw new Error('send_message_failed');
       setText('');
       setShowEmoji(false);
+      setReplyTo(null);
       await load();
     } catch {
       showSendError();
@@ -355,10 +360,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             appointment_id: appointmentId,
             sender_id: currentUserId,
             sender_name: currentUserName,
-            text: `[photo]${url}`
+            text: `[photo]${url}`,
+            reply_to_id: replyTo?.id || null,
+            reply_to_text: replyTo?.text || null
           })
         });
         if (!res.ok) throw new Error('send_photo_message_failed');
+        setReplyTo(null);
         await load();
       }
     } catch {
@@ -404,10 +412,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             appointment_id: appointmentId,
             sender_id: currentUserId,
             sender_name: currentUserName,
-            text: `[audio]${url}`
+            text: `[audio]${url}`,
+            reply_to_id: replyTo?.id || null,
+            reply_to_text: replyTo?.text || null
           })
         });
         if (!res.ok) throw new Error('send_audio_message_failed');
+        setReplyTo(null);
         await load();
       }
     } catch {
@@ -571,6 +582,46 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const displayName = contactName || 'Чат';
   const hasText = text.trim().length > 0;
 
+  const describeContent = (raw) => {
+    if (!raw) return { type: 'text', preview: '', raw: '' };
+    if (raw.startsWith('[photo]')) return { type: 'photo', preview: '📷 Фото', raw };
+    if (raw.startsWith('[audio]')) return { type: 'audio', preview: '🎤 Голосовое', raw };
+    return { type: 'text', preview: raw, raw };
+  };
+
+  const startReply = (msg) => {
+    if (!msg) return;
+    const meta = describeContent(msg.text || '');
+    setReplyTo({
+      id: msg.id,
+      text: msg.text || '',
+      preview: meta.preview || (msg.text || ''),
+      sender_name: msg.sender_name || 'Собеседник',
+      type: meta.type
+    });
+  };
+
+  const handleReplyPointerDown = (msg, event) => {
+    const clientX = typeof event?.clientX === 'number' ? event.clientX : 0;
+    swipeReplyRef.current = { startX: clientX, triggered: false, message: msg };
+  };
+
+  const handleReplyPointerMove = (event) => {
+    if (!swipeReplyRef.current.startX) return;
+    const clientX = typeof event?.clientX === 'number' ? event.clientX : 0;
+    const delta = clientX - swipeReplyRef.current.startX;
+    if (delta > 55) {
+      swipeReplyRef.current.triggered = true;
+    }
+  };
+
+  const handleReplyPointerUp = () => {
+    if (swipeReplyRef.current.triggered && swipeReplyRef.current.message) {
+      startReply(swipeReplyRef.current.message);
+    }
+    swipeReplyRef.current = {};
+  };
+
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) {
@@ -653,6 +704,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                   : null;
                 const showDate = !prevMs || new Date(curMs).toDateString() !== new Date(prevMs).toDateString();
                 const isOwn = String(m.sender_id) === String(currentUserId);
+                const replyMeta = describeContent(m.reply_to_text || '');
 
                 return (
                   <motion.div
@@ -672,7 +724,44 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                       {!isOwn && (
                         <span className={styles.senderName}>{m.sender_name || 'Собеседник'}</span>
                       )}
-                      <div className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}>
+                      <div
+                        className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}
+                        onPointerDown={(e) => handleReplyPointerDown(m, e)}
+                        onPointerMove={handleReplyPointerMove}
+                        onPointerUp={handleReplyPointerUp}
+                        onPointerLeave={handleReplyPointerUp}
+                        onPointerCancel={handleReplyPointerUp}
+                        onDoubleClick={() => startReply(m)}
+                      >
+                        {m.reply_to_text && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 10,
+                              alignItems: 'flex-start',
+                              padding: '6px 10px',
+                              marginBottom: 6,
+                              borderRadius: 10,
+                              background: 'rgba(0,0,0,0.12)'
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 3,
+                                borderRadius: 2,
+                                background: 'rgba(140,200,255,0.8)',
+                                flexShrink: 0,
+                                minHeight: 32
+                              }}
+                            />
+                            <div>
+                              <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Ответ</p>
+                              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
+                                {replyMeta.preview}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                         {m.text?.startsWith('[booking_card]') ? (
                           <BookingCard raw={m.text.replace('[booking_card]', '')} />
                         ) : m.text?.startsWith('[photo]') ? (
@@ -730,53 +819,6 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
             <div ref={bottomRef} />
           </div>
 
-          {/* ── Emoji Panel ── */}
-          <AnimatePresence>
-            {showEmoji && (
-              <motion.div
-                className={styles.emojiPanel}
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22, ease: 'easeOut' }}
-              >
-                <div className={styles.emojiGrid}>
-                  {EMOJIS.map((emoji) => (
-                    <motion.button
-                      key={emoji}
-                      onClick={() => insertEmoji(emoji)}
-                      className={styles.emojiButton}
-                      whileTap={{ scale: 0.82 }}
-                    >
-                      {emoji}
-                    </motion.button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <AnimatePresence>
-            {micError && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                style={{
-                  padding: '8px 16px',
-                  background: 'rgba(255,59,48,0.15)',
-                  borderTop: '1px solid rgba(255,59,48,0.25)',
-                  color: 'rgba(255,120,110,0.95)',
-                  fontSize: 13,
-                  textAlign: 'center',
-                  flexShrink: 0
-                }}
-              >
-                🎤 {micError}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           <AnimatePresence>
             {sendError && (
               <motion.div
@@ -797,6 +839,61 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                 }}
               >
                 {sendError}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {replyTo && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '10px 14px',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 16,
+                  margin: '0 16px 12px',
+                  position: 'relative'
+                }}
+              >
+                <div
+                  style={{
+                    width: 4,
+                    borderRadius: 3,
+                    background: 'rgba(140,200,255,0.85)',
+                    alignSelf: 'stretch'
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>
+                    {replyTo.sender_name || 'Собеседник'}
+                  </p>
+                  <p style={{ margin: '2px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.95)' }}>
+                    {replyTo.preview || replyTo.text}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  style={{
+                    border: 'none',
+                    background: 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    lineHeight: '28px'
+                  }}
+                >
+                  ×
+                </button>
               </motion.div>
             )}
           </AnimatePresence>

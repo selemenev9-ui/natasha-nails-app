@@ -1139,12 +1139,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                 onPointerDown={startRecording}
                 onPointerUp={stopRecording}
                 onPointerCancel={cancelRecording}
+                onPointerLeave={(e) => { if (recording && e.buttons === 0) stopRecording(); }}
                 whileTap={{ scale: 0.9 }}
                 animate={recording ? {
                   scale: [1, 1.15, 1],
                   boxShadow: ['0 0 0 0 rgba(255,59,48,0)', '0 0 0 12px rgba(255,59,48,0.3)', '0 0 0 0 rgba(255,59,48,0)']
-                } : {}}
-                transition={recording ? { duration: 1, repeat: Infinity } : {}}
+                } : { scale: 1, boxShadow: '0 0 0 0 rgba(255,59,48,0)' }}
+                transition={recording ? { duration: 1, repeat: Infinity } : { duration: 0.2 }}
                 disabled={sending}
               >
                 <IconMic active={recording} />

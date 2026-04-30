@@ -743,18 +743,30 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   };
 
   const handleReplyPointerDown = (msg, event) => {
-    const clientX = event?.clientX ?? event?.touches?.[0]?.clientX ?? 0;
-    const clientY = event?.clientY ?? event?.touches?.[0]?.clientY ?? 0;
-    swipeReplyRef.current = { startX: clientX, startY: clientY, triggered: false, message: msg };
+    const pointer = event?.touches?.[0] || event;
+    const clientX = pointer?.clientX ?? 0;
+    const clientY = pointer?.clientY ?? 0;
+    swipeReplyRef.current = {
+      startX: clientX,
+      startY: clientY,
+      triggered: false,
+      message: msg,
+      element: event.currentTarget
+    };
   };
 
   const handleReplyPointerMove = (event) => {
     if (!swipeReplyRef.current.startX) return;
-    const clientX = event?.clientX ?? event?.touches?.[0]?.clientX ?? 0;
-    const clientY = event?.clientY ?? event?.touches?.[0]?.clientY ?? 0;
+    const pointer = event?.touches?.[0] || event;
+    const clientX = pointer?.clientX ?? 0;
+    const clientY = pointer?.clientY ?? 0;
     const delta = clientX - swipeReplyRef.current.startX;
     const deltaY = Math.abs(clientY - (swipeReplyRef.current.startY || clientY));
     if (deltaY > 20) {
+      if (swipeReplyRef.current.element) {
+        swipeReplyRef.current.element.style.transition = 'transform 0.2s ease';
+        swipeReplyRef.current.element.style.transform = '';
+      }
       swipeReplyRef.current = {};
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
@@ -766,23 +778,25 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
+    if (delta > 0 && swipeReplyRef.current.element) {
+      const offset = Math.min(delta, 70);
+      swipeReplyRef.current.element.style.transition = 'none';
+      swipeReplyRef.current.element.style.transform = `translateX(${offset}px)`;
+    }
     if (delta > 40) {
       swipeReplyRef.current.triggered = true;
     }
   };
 
   const handleReplyPointerUp = () => {
+    if (swipeReplyRef.current.element) {
+      swipeReplyRef.current.element.style.transition = 'transform 0.25s ease';
+      swipeReplyRef.current.element.style.transform = '';
+    }
     if (swipeReplyRef.current.triggered && swipeReplyRef.current.message) {
       startReply(swipeReplyRef.current.message);
     }
     swipeReplyRef.current = {};
-  };
-
-  const openReactionPicker = (messageId, event) => {
-    const rect = event?.currentTarget?.getBoundingClientRect();
-    const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
-    const y = rect ? rect.top - 10 : window.innerHeight / 2;
-    setReactionPicker({ messageId, x, y });
   };
 
   const closeReactionPicker = () => setReactionPicker({ messageId: null, x: 0, y: 0 });
@@ -912,7 +926,10 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                           try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
                           handleReplyPointerDown(m, e);
                           if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-                          holdTimerRef.current = setTimeout(() => openReactionPicker(m.id, e), 500);
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          holdTimerRef.current = setTimeout(() => {
+                            setReactionPicker({ messageId: m.id, x: rect.left + rect.width / 2, y: rect.top - 10 });
+                          }, 500);
                         }}
                         onPointerMove={handleReplyPointerMove}
                         onPointerUp={(e) => {
@@ -934,11 +951,6 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                           if (holdTimerRef.current) {
                             clearTimeout(holdTimerRef.current);
                             holdTimerRef.current = null;
-                          }
-                        }}
-                        onMouseUp={(e) => {
-                          if (!('ontouchstart' in window)) {
-                            openReactionPicker(m.id, e);
                           }
                         }}
                         onDoubleClick={() => startReply(m)}

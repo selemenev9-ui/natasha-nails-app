@@ -1103,7 +1103,7 @@ export const handler = (async (event) => {
         );
       });
       notifyMasters(
-        `🆕 Новая запись!\n👤 ${safe(client_name || client_id)}\n📱 ${safe(client_phone || '')}\n💅 ${safe(service_id)}\n📅 ${safe(date)}\n💰 ${Number(totalPrice) || 0} ₽`
+        `🆕 Новая запись!\n👤 ${safe(client_name || client_id)}\n📱 ${safe(client_phone || '')}\n💅 ${safe(service_title || service_id)}\n📅 ${safe(date)}\n💰 ${Number(totalPrice) || 0} ₽`
       ).catch(() => {});
 
       // Отправить карточку записи в чат клиента

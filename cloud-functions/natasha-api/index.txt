@@ -1043,14 +1043,15 @@ export const handler = (async (event) => {
       }
 
       if (body.action === 'remove_reaction') {
-        const { message_id, user_id } = body;
+        const { message_id, user_id, emoji } = body;
         if (!message_id || !user_id) {
           return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'missing fields' }) };
         }
         await withSession(async (session) => {
           await session.executeQuery(
             `DELETE FROM reactions WHERE message_id = "${safe(message_id)}"
-             AND user_id = "${safe(String(user_id))}";`
+             AND user_id = "${safe(String(user_id))}"
+             AND emoji = "${safe(emoji)}";`
           );
         });
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };

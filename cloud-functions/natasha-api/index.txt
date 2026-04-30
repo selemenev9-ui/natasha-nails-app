@@ -134,6 +134,8 @@ function formatDateRu(value) {
   return date.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
+const safe = (s) => String(s || '').replace(/["'\\]/g, '');
+
 let cachedDriver = null;
 let driverInitPromise = null;
 

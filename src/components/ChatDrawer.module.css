@@ -171,6 +171,8 @@
   font-size: 15px;
   line-height: 1.45;
   word-break: break-word;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .bubbleOwner {

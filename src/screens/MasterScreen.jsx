@@ -458,6 +458,7 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule,
 function AppCard({ a, onAction, showActions, onReschedule, onChat, onDelete }) {
   const st = STATUS_LABELS[a.status] || STATUS_LABELS.pending;
   const [expanded, setExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const clientLabel = normalizeName(a.client_name || `VK: ${a.client_id}`);
   const avatar = getAvatarMeta(clientLabel);
   const [touchOffset, setTouchOffset] = useState(0);
@@ -591,19 +592,22 @@ function AppCard({ a, onAction, showActions, onReschedule, onChat, onDelete }) {
                 )}
               </div>
             )}
-            {showActions && a.status === 'cancelled' && onDelete && (
+            {showActions && onDelete && (
               <div className={styles.actionsRow}>
-                <button
-                  className={styles.btnCancel}
-                  style={{ fontSize: 12 }}
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && window.confirm('Удалить эту запись навсегда?')) {
-                      onDelete(a.id);
-                    }
-                  }}
-                >
-                  🗑 Удалить
-                </button>
+                {!confirmDelete ? (
+                  <button className={styles.btnDeleteSoft} style={{ fontSize: 12 }} onClick={() => setConfirmDelete(true)}>
+                    🗑 Удалить
+                  </button>
+                ) : (
+                  <>
+                    <button className={styles.btnDelete} onClick={() => { onDelete(a.id); setConfirmDelete(false); }}>
+                      Да, удалить
+                    </button>
+                    <button className={styles.btnCancel} onClick={() => setConfirmDelete(false)}>
+                      Нет
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </motion.div>
@@ -979,13 +983,14 @@ function AnalyticsTab({ appointments, services }) {
   // Выручка в час по услугам
   const serviceStats = {};
   active.forEach(a => {
-    const key = a.title || a.service_id;
+    const key = a.title;
+    if (!key) return;
     const svc = services.find(s => s.id === a.service_id);
     const mins = svc?.durationMinutes || svc?.duration_minutes || 60;
     if (!serviceStats[key]) serviceStats[key] = { revenue: 0, count: 0, totalMins: 0 };
-    serviceStats[key].revenue    += a.total_price || 0;
-    serviceStats[key].count      += 1;
-    serviceStats[key].totalMins  += mins;
+    serviceStats[key].revenue   += a.total_price || 0;
+    serviceStats[key].count     += 1;
+    serviceStats[key].totalMins += mins;
   });
   const serviceRating = Object.entries(serviceStats)
     .map(([name, s]) => ({

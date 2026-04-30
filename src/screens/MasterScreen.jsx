@@ -315,6 +315,7 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule,
   const today = todayKey();
   const todayAppts = appointments
     .filter(a => dateKey(a.appointment_date) === today)
+    .filter(a => a.status !== 'cancelled')
     .sort((a, b) => a.appointment_date - b.appointment_date);
 
   const pending = appointments.filter(a => a.status === 'pending');
@@ -393,7 +394,7 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule,
               })()}
               <div>
                 <p className={styles.cardTitle}>{normalizeName(nextAppt.client_name || `VK: ${nextAppt.client_id}`)}</p>
-                <p className={styles.cardSub}>{nextAppt.title || nextAppt.service_id} · {tsToTime(nextAppt.appointment_date)}</p>
+                <p className={styles.cardSub}>{nextAppt.title || '—'} · {tsToTime(nextAppt.appointment_date)}</p>
               </div>
             </div>
             <div className={styles.nextCountdown}>{nextCountdown}</div>
@@ -435,7 +436,7 @@ function TodayTab({ appointments, services, onAction, onAddManual, onReschedule,
                 <div className={`${styles.timeAppt} glass-panel`}
                   style={{ borderLeft: `3px solid ${STATUS_LABELS[appt.status]?.color || '#6366f1'}` }}>
                   <p className={styles.timeApptTitle}>{appt.client_name || `ID: ${appt.client_id}`}</p>
-                  <p className={styles.timeApptSub}>{appt.title || appt.service_id}</p>
+                  <p className={styles.timeApptSub}>{appt.title || '—'}</p>
                   {appt.total_price > 0 && <p className={styles.timeApptPrice}>{appt.total_price.toLocaleString('ru-RU')} ₽</p>}
                 </div>
               ) : (
@@ -525,7 +526,7 @@ function AppCard({ a, onAction, showActions, onReschedule, onChat, onDelete }) {
           <div className={styles.avatar} style={{ background: avatar.color }}>{avatar.initials}</div>
           <div>
             <p className={styles.cardTitle}>{clientLabel}</p>
-            <p className={styles.cardSub}>{a.title || a.service_id} · {tsToTime(a.appointment_date)}</p>
+            <p className={styles.cardSub}>{a.title || '—'} · {tsToTime(a.appointment_date)}</p>
             <p className={styles.cardSub}>{formatDate(a.appointment_date)}</p>
           </div>
         </div>

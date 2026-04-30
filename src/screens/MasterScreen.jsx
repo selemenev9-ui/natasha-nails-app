@@ -627,10 +627,15 @@ function AppCard({ a, onAction, showActions, onReschedule, onChat, onDelete }) {
 function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat, onDelete }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [showCancelled, setShowCancelled] = useState(false);
+  const todayRef = useRef(null);
 
-  const days = Array.from({ length: 7 }, (_, i) => {
+  useEffect(() => {
+    todayRef.current?.scrollIntoView({ inline: 'center', behavior: 'smooth' });
+  }, []);
+
+  const days = Array.from({ length: 61 }, (_, i) => {
     const d = new Date();
-    d.setDate(d.getDate() + i);
+    d.setDate(d.getDate() - 30 + i);
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
   });
 
@@ -646,10 +651,12 @@ function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat
         {days.map(day => {
           const d = new Date(day + 'T12:00:00');
           const hasAppts = appointments.some(a => dateKey(a.appointment_date) === day && a.status !== 'cancelled');
+          const isToday = day === todayKey();
           return (
             <button key={day}
               className={`${styles.dayBtn} ${selectedDate === day ? styles.dayBtnActive : ''} glass-panel`}
-              onClick={() => setSelectedDate(day)}>
+              onClick={() => setSelectedDate(day)}
+              ref={isToday ? todayRef : null}>
               <span className={styles.dayName}>
                 {d.toLocaleDateString('ru-RU', { weekday: 'short' })}
               </span>
@@ -699,6 +706,7 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
   const [clientProfile, setClientProfile] = useState(null);
   const [clientHistory, setClientHistory] = useState([]);
   const clientModalRef = useRef(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     clientModalRef.current = Boolean(selectedClient);
@@ -769,6 +777,18 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
   const closeClient = () => {
     setSelectedClient(null);
     onModalClose?.();
+  };
+
+  const handleDeleteHistory = async (appointmentId) => {
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_appointment', id: appointmentId })
+      });
+      setClientHistory(prev => prev.filter(a => a.id !== appointmentId));
+    } catch {}
+    setDeletingId(null);
   };
 
   const saveNotes = async () => {
@@ -939,6 +959,23 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
                               : ' 🕐 Подтверждено'}
                           {a.total_price > 0 && ` · ${a.total_price.toLocaleString('ru-RU')} ₽`}
                         </p>
+                        <div style={{ marginTop: 6 }}>
+                          {deletingId === a.id ? (
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button className={styles.btnDelete} onClick={() => handleDeleteHistory(a.id)}>
+                                Да, удалить
+                              </button>
+                              <button className={styles.btnCancel} onClick={() => setDeletingId(null)}>
+                                Нет
+                              </button>
+                            </div>
+                          ) : (
+                            <button className={styles.btnDeleteSoft} style={{ fontSize: 11 }}
+                              onClick={() => setDeletingId(a.id)}>
+                              🗑
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

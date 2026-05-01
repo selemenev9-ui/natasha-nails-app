@@ -224,6 +224,8 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const isLoadingOlderRef = useRef(false);
   const scrollContainerRef = useRef(null);
   const isNearBottomRef = useRef(true);
+  const autoScrollRef = useRef(false);
+  const autoScrollTimerRef = useRef(null);
 
   const load = async (forceFull = false, beforeTs = 0) => {
     if (!appointmentId) return;
@@ -324,15 +326,21 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   }, [appointmentId, currentUserId]);
 
   useEffect(() => {
-    if (isNearBottomRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: isLoadingOlderRef.current ? 'auto' : 'smooth' });
-    }
+    if (!isNearBottomRef.current) return;
+    autoScrollRef.current = true;
+    if (autoScrollTimerRef.current) clearTimeout(autoScrollTimerRef.current);
+    bottomRef.current?.scrollIntoView({ behavior: isLoadingOlderRef.current ? 'auto' : 'smooth' });
+    autoScrollTimerRef.current = setTimeout(() => {
+      autoScrollRef.current = false;
+      isNearBottomRef.current = true;
+    }, isLoadingOlderRef.current ? 100 : 500);
   }, [messages]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     const onScroll = () => {
+      if (autoScrollRef.current) return;
       const { scrollTop, scrollHeight, clientHeight } = container;
       isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 120;
       if (scrollTop < 80 && hasMoreRef.current && !isLoadingOlderRef.current) {
@@ -373,6 +381,23 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 100) + 'px';
   }, [text]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const handleSelection = () => {
+      const sel = window.getSelection?.();
+      if (!sel || sel.isCollapsed) return;
+      const anchorNode = sel.anchorNode;
+      if (anchorNode && scrollContainerRef.current?.contains(anchorNode)) {
+        sel.removeAllRanges();
+      }
+    };
+    document.addEventListener('selectionchange', handleSelection);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelection);
+      if (autoScrollTimerRef.current) clearTimeout(autoScrollTimerRef.current);
+    };
+  }, []);
 
   const showSendError = () => {
     setSendError('Не удалось отправить сообщение. Попробуй ещё раз');
@@ -938,7 +963,13 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                       )}
                       <div
                         className={`${styles.bubble} ${isOwn ? styles.bubbleOwner : styles.bubblePeer}`}
-                        style={{ ...(m._pending ? { opacity: 0.6 } : {}), touchAction: 'pan-y' }}
+                        style={{
+                          ...(m._pending ? { opacity: 0.6 } : {}),
+                          touchAction: 'pan-y',
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                          WebkitTouchCallout: 'none'
+                        }}
                         onPointerDown={(e) => {
                           try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
                           if (e.pointerType === 'touch') e.preventDefault();
@@ -965,6 +996,30 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                           }
                         }}
                         onPointerCancel={() => {
+                          handleReplyPointerUp();
+                          if (holdTimerRef.current) {
+                            clearTimeout(holdTimerRef.current);
+                            holdTimerRef.current = null;
+                          }
+                        }}
+                        onTouchStartCapture={(e) => {
+                          e.preventDefault();
+                          handleReplyPointerDown(m, e);
+                          if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          holdTimerRef.current = setTimeout(() => {
+                            setReactionPicker({ messageId: m.id, x: rect.left + rect.width / 2, y: rect.top - 10 });
+                          }, 500);
+                        }}
+                        onTouchMove={handleReplyPointerMove}
+                        onTouchEnd={() => {
+                          handleReplyPointerUp();
+                          if (holdTimerRef.current) {
+                            clearTimeout(holdTimerRef.current);
+                            holdTimerRef.current = null;
+                          }
+                        }}
+                        onTouchCancel={() => {
                           handleReplyPointerUp();
                           if (holdTimerRef.current) {
                             clearTimeout(holdTimerRef.current);

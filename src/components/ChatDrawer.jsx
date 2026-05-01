@@ -802,6 +802,24 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
   const closeReactionPicker = () => setReactionPicker({ messageId: null, x: 0, y: 0 });
 
   const handleReactionToggle = async (messageId, emoji, hasReaction) => {
+    setMessages((prev) => prev.map((m) => {
+      if (m.id !== messageId) return m;
+      const reactions = m.reactions || [];
+      if (hasReaction) {
+        return {
+          ...m,
+          reactions: reactions.filter(
+            (r) => !(r.emoji === emoji && String(r.user_id) === String(currentUserId))
+          )
+        };
+      }
+      return {
+        ...m,
+        reactions: [...reactions, { emoji, user_id: String(currentUserId) }]
+      };
+    }));
+    closeReactionPicker();
+
     try {
       await fetch(API_URL, {
         method: 'POST',
@@ -813,7 +831,6 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
           emoji
         })
       });
-      closeReactionPicker();
     } catch {}
   };
 

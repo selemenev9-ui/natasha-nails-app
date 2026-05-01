@@ -941,6 +941,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                         style={{ ...(m._pending ? { opacity: 0.6 } : {}), touchAction: 'pan-y' }}
                         onPointerDown={(e) => {
                           try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+                          if (e.pointerType === 'touch') e.preventDefault();
                           handleReplyPointerDown(m, e);
                           if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
                           const rect = e.currentTarget.getBoundingClientRect();
@@ -970,6 +971,7 @@ export default function ChatDrawer({ appointmentId, currentUserId, currentUserNa
                             holdTimerRef.current = null;
                           }
                         }}
+                        onContextMenu={(e) => e.preventDefault()}
                         onDoubleClick={() => startReply(m)}
                       >
                         {m.reply_to_text && (

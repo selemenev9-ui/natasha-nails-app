@@ -698,7 +698,7 @@ function ScheduleTab({ appointments, onAction, onAddManual, onReschedule, onChat
 }
 
 // ─── CLIENTS TAB ──────────────────────────────────────────────────────────────
-function ClientsTab({ appointments, onModalOpen, onModalClose }) {
+function ClientsTab({ appointments, onModalOpen, onModalClose, onChat }) {
   const [selectedClient, setSelectedClient] = useState(null);
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
@@ -924,11 +924,27 @@ function ClientsTab({ appointments, onModalOpen, onModalClose }) {
                 <button className={styles.btnSave} disabled={savingNotes} onClick={saveNotes}>
                   {savingNotes ? '…' : '💾 Сохранить'}
                 </button>
-                <a href={`https://vk.com/im?sel=${selectedClient.id}`} target="_blank" rel="noreferrer"
-                  className={styles.btnCancel} style={{ textDecoration: 'none', textAlign: 'center' }}>
-                  Написать в ВК
-                </a>
+                {selectedClient.phone && (
+                  <a href={`tel:${selectedClient.phone}`}
+                    className={styles.btnCancel}
+                    style={{ textDecoration: 'none', textAlign: 'center' }}>
+                    📞 Позвонить
+                  </a>
+                )}
+                {!String(selectedClient.id).startsWith('manual') && (
+                  <a href={`https://vk.com/im?sel=${selectedClient.id}`} target="_blank" rel="noreferrer"
+                    className={styles.btnCancel} style={{ textDecoration: 'none', textAlign: 'center' }}>
+                    ВКонтакте
+                  </a>
+                )}
               </div>
+              <button
+                className={styles.btnEdit}
+                style={{ width: '100%', marginTop: 8 }}
+                onClick={() => { closeClient(); onChat && onChat(selectedClient); }}
+              >
+                💬 Написать в чат
+              </button>
 
               {clientHistory.length > 0 && (
                 <div style={{ marginTop: 12 }}>
@@ -1759,7 +1775,7 @@ export default function MasterScreen() {
                 onDelete={handleDeleteAppointment}
               />
             )}
-            {tab === 'clients'   && <ClientsTab appointments={appointments} onModalOpen={markModalOpen} onModalClose={markModalClosed} />}
+            {tab === 'clients'   && <ClientsTab appointments={appointments} onModalOpen={markModalOpen} onModalClose={markModalClosed} onChat={(client) => setChatAppointment({ client_id: client.id, client_name: client.name })} />}
             {tab === 'services'  && <ServicesTab />}
             {tab === 'chat'      && (
               <ChatTab

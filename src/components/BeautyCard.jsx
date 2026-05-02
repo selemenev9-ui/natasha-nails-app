@@ -148,7 +148,8 @@ export default function BeautyCard({ firstName, vkId, theme = 'light' }) {
     () => ({
       transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
       transition: isReturning ? 'transform 0.5s ease' : 'transform 0.1s ease-out',
-      boxShadow: `${-rotateY * 1.1}px ${16 + rotateX * 1.1}px 34px rgba(0, 0, 0, 0.18)`
+      boxShadow: 'none',
+      filter: `drop-shadow(${ -rotateY * 0.6}px ${12 + rotateX * 0.6}px 26px rgba(56, 40, 28, 0.22)) drop-shadow(0 4px 12px rgba(255, 255, 255, 0.3))`
     }),
     [isReturning, rotateX, rotateY]
   );
@@ -256,11 +257,40 @@ export default function BeautyCard({ firstName, vkId, theme = 'light' }) {
           </div>
 
         <div className={styles.backFace} style={{ transform: 'rotateY(180deg) translateZ(1px)' }}>
+          <div className={styles.holoGlow} aria-hidden="true" />
           <div className={styles.magneticStrip} />
-          <div className={styles.backContent}>
-            <p>PRIVATE MEMBER</p>
-            <p className={styles.vkId}>{displayVkId}</p>
+
+          <div className={styles.backTopRow}>
+            <div>
+              <p className={styles.backLabel}>Natasha Premium Lab</p>
+              <p className={styles.backTagline}>Liquid Pearl Club</p>
+            </div>
+            <div className={styles.holoSeal} aria-hidden="true">NL</div>
           </div>
+
+          <div className={styles.signaturePanel}>
+            <span className={styles.signatureLabel}>Подпись</span>
+            <span className={styles.signatureValue}>{displayName}</span>
+          </div>
+
+          <div className={styles.backMeta}>
+            <div className={styles.metaBlock}>
+              <p className={styles.metaLabel}>Beauty ID</p>
+              <p className={styles.metaValue}>{displayVkId}</p>
+            </div>
+            <div className={styles.metaBlock}>
+              <p className={styles.metaLabel}>Статус</p>
+              <p className={styles.metaValue}>PREMIUM</p>
+            </div>
+            <div className={styles.qrStub} aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+
+          <p className={styles.backHelp}>Если нашли карту — напишите @natasha_premium_lab</p>
           </div>
 
       </motion.article>

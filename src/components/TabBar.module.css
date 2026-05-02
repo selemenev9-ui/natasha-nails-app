@@ -12,17 +12,21 @@
   align-items: center;
   border-radius: 28px;
   z-index: 40;
+
   background:
-    radial-gradient(circle at 50% 0%, rgba(100, 180, 255, 0.08), transparent 60%),
-    rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+    radial-gradient(ellipse at 50% -30%, rgba(255, 255, 255, 0.95) 0%, transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.90) 0%, rgba(252, 248, 244, 0.82) 100%);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+
+  border: 1px solid rgba(255, 255, 255, 0.92);
+
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(100, 180, 255, 0.08),
-    0 16px 40px rgba(0, 5, 15, 0.45),
-    0 2px 8px rgba(100, 180, 255, 0.06);
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(210, 190, 170, 0.14),
+    0 2px 8px rgba(40, 28, 18, 0.06),
+    0 8px 32px rgba(40, 28, 18, 0.11),
+    0 24px 56px rgba(40, 28, 18, 0.08);
 }
 
 .tab {
@@ -59,7 +63,6 @@
   border-radius: 12px;
   transition: background 0.3s var(--smooth);
 }
-
 
 .unreadBadge {
   position: absolute;
@@ -100,15 +103,15 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: rgba(100, 180, 255, 0.9);
-  box-shadow: 0 0 6px rgba(100, 180, 255, 0.7);
+  background: rgba(160, 100, 55, 0.8);
+  box-shadow: 0 0 6px rgba(160, 100, 55, 0.5);
 }
 
 .flash {
   position: absolute;
   inset: 0;
   border-radius: 12px;
-  background: radial-gradient(circle at 50% 60%, rgba(100, 180, 255, 0.35), transparent 70%);
+  background: radial-gradient(circle at 50% 60%, rgba(160, 100, 55, 0.18), transparent 70%);
   pointer-events: none;
 }
 

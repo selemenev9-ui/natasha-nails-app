@@ -10,7 +10,7 @@ const InfoScreen = lazy(() => import('./screens/InfoScreen.jsx'));
 const MasterScreen = lazy(() => import('./screens/MasterScreen.jsx'));
 import OnboardingScreen from './screens/OnboardingScreen.jsx';
 import TabBar from './components/TabBar.jsx';
-import NeuralBackground from './components/NeuralBackground.jsx';
+import LiquidBackground from './components/LiquidBackground.jsx';
 import SplashScreen from './components/SplashScreen.jsx';
 import { useVK } from './contexts/VKContext.jsx';
 
@@ -165,7 +165,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="material" />
-      <NeuralBackground paused={isChatDrawerOpen} />
+      <LiquidBackground paused={isChatDrawerOpen} />
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen}

@@ -183,11 +183,6 @@ export default function BookingScreen({ onNavigate, onConfirmChange, preSelected
   return (
     <>
       <div className={styles.booking}>
-        <div className={styles.ambientContainer} aria-hidden="true">
-          <div className={styles.auroraMesh} />
-          <div className={styles.noiseOverlay} />
-        </div>
-
         <div className={styles.contentLayer}>
           <motion.div
             className={styles.step}

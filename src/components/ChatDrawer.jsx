@@ -95,7 +95,14 @@ const AudioBubble = memo(function AudioBubble({ url }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.load();
+  }, [url]);
 
   const toggle = () => {
     const audio = audioRef.current;
@@ -109,26 +116,51 @@ const AudioBubble = memo(function AudioBubble({ url }) {
   };
 
   const formatTime = (sec) => {
-    if (!Number.isFinite(sec) || sec < 0) return '00:00';
-    const minutes = Math.floor(sec / 60).toString().padStart(2, '0');
+    if (!Number.isFinite(sec) || sec < 0 || sec === Infinity) return '0:00';
+    const minutes = Math.floor(sec / 60);
     const seconds = Math.floor(sec % 60).toString().padStart(2, '0');
     return `${minutes}:${seconds}`;
   };
+
+  const handleLoadedMetadata = (e) => {
+    const d = e.target.duration;
+    if (Number.isFinite(d) && d > 0) {
+      setDuration(d);
+    }
+  };
+
+  const handleDurationChange = (e) => {
+    const d = e.target.duration;
+    if (Number.isFinite(d) && d > 0) {
+      setDuration(d);
+    }
+  };
+
+  const handleTimeUpdate = (e) => {
+    const cur = e.target.currentTime;
+    const total = e.target.duration;
+    setCurrentTime(cur);
+    if (Number.isFinite(total) && total > 0) {
+      setProgress(Math.min(cur / total, 1));
+      if (duration === 0) setDuration(total);
+    }
+  };
+
+  const displayDuration = playing ? currentTime : duration;
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 180 }}>
       <audio
         ref={audioRef}
         src={url}
-        onTimeUpdate={(e) => {
-          const current = e.target.currentTime;
-          const total = e.target.duration || 1;
-          setProgress(Math.min(current / total, 1));
-        }}
-        onLoadedMetadata={(e) => setDuration(e.target.duration || 0)}
+        preload="metadata"
+        onLoadedMetadata={handleLoadedMetadata}
+        onDurationChange={handleDurationChange}
+        onTimeUpdate={handleTimeUpdate}
         onEnded={() => {
           setPlaying(false);
           setProgress(0);
+          setCurrentTime(0);
         }}
       />
       <motion.button
@@ -176,7 +208,7 @@ const AudioBubble = memo(function AudioBubble({ url }) {
           }} />
         </div>
         <div style={{ fontSize: 10, color: 'rgba(140,200,255,0.5)', marginTop: 3 }}>
-          {playing ? formatTime(audioRef.current?.currentTime || 0) : formatTime(duration)}
+          {formatTime(displayDuration)}
         </div>
       </div>
     </div>

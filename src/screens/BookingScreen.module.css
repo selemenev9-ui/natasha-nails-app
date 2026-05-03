@@ -428,8 +428,8 @@
   pointer-events: none;
   padding: 40px 24px calc(var(--safe-bottom) + 40px);
   background:
-    radial-gradient(circle at 50% 20%, rgba(40, 100, 200, 0.18), transparent 60%),
-    linear-gradient(160deg, #010910 0%, #031726 40%, #063147 100%);
+    radial-gradient(circle at 50% 15%, rgba(255, 235, 205, 0.55), transparent 58%),
+    linear-gradient(160deg, #fdf8f3 0%, #f5ede0 50%, #ede0cf 100%);
   color: var(--ink);
   display: flex;
   flex-direction: column;
@@ -444,17 +444,18 @@
   width: 100%;
   max-width: 360px;
   border-radius: 28px;
-  border: 1px solid rgba(100, 180, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.92);
   background:
-    radial-gradient(circle at 20% 0%, rgba(100, 180, 255, 0.12), transparent 55%),
-    linear-gradient(160deg, rgba(10, 22, 42, 0.97), rgba(4, 8, 20, 0.98));
-  backdrop-filter: blur(40px) saturate(160%);
-  -webkit-backdrop-filter: blur(40px) saturate(160%);
+    radial-gradient(ellipse at 20% 0%, rgba(255, 255, 255, 0.9) 0%, transparent 55%),
+    linear-gradient(155deg, rgba(255, 252, 248, 0.88) 0%, rgba(248, 240, 230, 0.82) 100%);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -4px 20px rgba(0, 0, 0, 0.5),
-    0 0 60px rgba(60, 140, 255, 0.12),
-    0 24px 60px rgba(0, 5, 20, 0.65);
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -2px 8px rgba(200, 175, 145, 0.15),
+    0 2px 8px rgba(80, 45, 10, 0.06),
+    0 16px 40px rgba(80, 45, 10, 0.13),
+    0 32px 72px rgba(80, 45, 10, 0.09);
   padding: 28px 24px 24px;
   display: flex;
   flex-direction: column;
@@ -473,14 +474,14 @@
   font-size: 11px;
   letter-spacing: 0.32em;
   text-transform: uppercase;
-  color: rgba(140, 200, 255, 0.7);
+  color: rgba(160, 120, 65, 0.85);
 }
 
 .receiptTag {
   font-size: 9px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(100, 160, 255, 0.45);
+  color: rgba(160, 120, 65, 0.5);
 }
 
 .receiptCheckWrap {
@@ -488,13 +489,13 @@
   height: 64px;
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(60, 130, 255, 0.15), transparent 70%);
+    radial-gradient(circle, rgba(80, 180, 100, 0.12), transparent 70%);
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
-    0 0 28px rgba(80, 160, 255, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 0 28px rgba(80, 180, 100, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .receiptCheckSvg {
@@ -518,8 +519,8 @@
   height: 1px;
   background: repeating-linear-gradient(
     90deg,
-    rgba(100, 180, 255, 0.25) 0px,
-    rgba(100, 180, 255, 0.25) 6px,
+    rgba(180, 145, 90, 0.28) 0px,
+    rgba(180, 145, 90, 0.28) 6px,
     transparent 6px,
     transparent 12px
   );
@@ -552,7 +553,7 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-align: center;
-  color: rgba(100, 160, 255, 0.5);
+  color: rgba(160, 120, 65, 0.6);
   text-transform: uppercase;
 }
 
@@ -572,17 +573,18 @@
   padding: 16px;
   border-radius: 16px;
   border: none;
-  background:
-    radial-gradient(circle at 30% 40%, rgba(100, 180, 255, 0.22), transparent 60%),
-    linear-gradient(135deg, rgba(237, 244, 255, 0.95), rgba(200, 225, 255, 0.9));
-  color: rgba(4, 12, 28, 0.95);
+  background: linear-gradient(155deg,
+    rgba(38, 26, 14, 0.94) 0%,
+    rgba(22, 15, 6, 0.97) 100%);
+  color: rgba(255, 245, 228, 0.96);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.04em;
   cursor: pointer;
   box-shadow:
-    0 8px 28px rgba(80, 160, 255, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    inset 0 1px 0 rgba(255, 215, 140, 0.22),
+    0 8px 28px rgba(30, 18, 6, 0.28);
+  pointer-events: auto;
 }
 
 .confirmDoneBtn:active {
@@ -593,13 +595,14 @@
   width: 100%;
   padding: 13px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: transparent;
-  color: var(--ink-60);
+  border: 1px solid rgba(180, 145, 90, 0.3);
+  background: rgba(255, 252, 248, 0.5);
+  color: rgba(22, 17, 12, 0.55);
   font-size: 13px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .confirmOutline:active {

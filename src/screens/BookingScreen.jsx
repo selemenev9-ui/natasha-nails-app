@@ -391,10 +391,10 @@ export default function BookingScreen({ onNavigate, onConfirmChange, preSelected
                 transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.4 }}
               >
                 <svg className={styles.receiptCheckSvg} viewBox="0 0 56 56" fill="none">
-                  <circle cx="28" cy="28" r="27" stroke="rgba(100,180,255,0.35)" strokeWidth="1" />
+                  <circle cx="28" cy="28" r="27" stroke="rgba(180,140,80,0.35)" strokeWidth="1" />
                   <motion.path
                     d="M16 28 L24 36 L40 20"
-                    stroke="rgba(140,210,255,0.95)"
+                    stroke="rgba(60,160,85,0.95)"
                     strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"

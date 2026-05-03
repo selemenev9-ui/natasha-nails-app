@@ -188,7 +188,7 @@ export default function LiquidBackground({ paused = false }) {
         height: '100vh',
         zIndex: -1,
         pointerEvents: 'none',
-        filter: 'blur(0px)'
+        filter: 'saturate(2.6) brightness(0.97)'
       }}
     />
   );

@@ -1,3 +1,24 @@
+
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.cardTime {
+  font-size: 11px;
+  color: var(--ink-40, rgba(22, 17, 12, 0.4));
+  flex-shrink: 0;
+}
+
+.emptyText {
+  text-align: center;
+  color: var(--ink-60);
+  padding: 40px 20px;
+  font-size: 14px;
+}
 .screen {
   min-height: 100dvh;
   padding-bottom: var(--tabbar-space);
@@ -82,13 +103,13 @@
 
 .cardOnlineDot {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: #4CD964;
-  border: 2px solid #010910;
+  background: #4cd964;
+  border: 2px solid rgba(253, 248, 243, 0.95);
+  right: -2px;
+  bottom: -2px;
   box-shadow: 0 0 8px rgba(76,217,100,0.7);
 }
 

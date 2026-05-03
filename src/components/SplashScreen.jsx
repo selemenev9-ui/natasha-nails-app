@@ -38,7 +38,7 @@ export default function SplashScreen() {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(100, 180, 255, ${(1 - dist / 115) * 0.22})`;
+            ctx.strokeStyle = `rgba(200, 160, 100, ${(1 - dist / 115) * 0.28})`;
             ctx.lineWidth = 0.6;
             ctx.stroke();
           }
@@ -53,7 +53,7 @@ export default function SplashScreen() {
         const tw = p.opacity * (0.55 + 0.45 * Math.sin(t * 1.8 + p.phase));
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(140, 200, 255, ${tw})`;
+        ctx.fillStyle = `rgba(210, 165, 100, ${tw})`;
         ctx.fill();
       }
     }
@@ -70,7 +70,7 @@ export default function SplashScreen() {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'linear-gradient(160deg, #010910 0%, #031726 32%, #063147 68%, #0f4f69 100%)',
+        background: 'linear-gradient(160deg, #fdf8f3 0%, #faf0e8 45%, #f5e6d8 100%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -90,7 +90,7 @@ export default function SplashScreen() {
           width: 240,
           height: 240,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(40,120,200,0.18) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(220,180,120,0.22) 0%, transparent 70%)',
           filter: 'blur(24px)'
         }}
       />
@@ -108,7 +108,7 @@ export default function SplashScreen() {
           transition={{ duration: 0.9, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
           style={{
             height: '0.5px',
-            background: 'linear-gradient(90deg, transparent, rgba(140,200,255,0.55), transparent)',
+            background: 'linear-gradient(90deg, transparent, rgba(200,160,100,0.55), transparent)',
             marginBottom: 16,
             transformOrigin: 'center'
           }}
@@ -121,9 +121,8 @@ export default function SplashScreen() {
             fontSize: 27,
             letterSpacing: '0.5em',
             paddingRight: '0.5em',
-            color: 'rgba(237, 244, 255, 0.97)',
-            textTransform: 'uppercase',
-            textShadow: '0 0 36px rgba(100,180,255,0.45)'
+            color: 'rgba(22, 17, 12, 0.88)',
+            textShadow: '0 0 36px rgba(200,160,100,0.20)'
           }}
         >
           NATASHA LAB
@@ -139,7 +138,7 @@ export default function SplashScreen() {
             fontSize: 10,
             letterSpacing: '0.38em',
             paddingRight: '0.38em',
-            color: 'rgba(140,200,255,0.8)',
+            color: 'rgba(160, 115, 60, 0.72)',
             textTransform: 'uppercase',
             marginTop: 9
           }}
@@ -175,7 +174,7 @@ export default function SplashScreen() {
               width: 5,
               height: 5,
               borderRadius: '50%',
-              background: 'rgba(140, 200, 255, 0.75)'
+              background: 'rgba(195, 150, 80, 0.85)'
             }}
           />
         ))}

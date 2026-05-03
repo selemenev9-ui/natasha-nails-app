@@ -5,22 +5,24 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(1, 5, 14, 0.75);
+  background: rgba(40, 25, 10, 0.40);
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .sheet {
   width: min(520px, 100%);
   border-radius: 32px 32px 24px 24px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   background:
-    radial-gradient(circle at 30% 0%, rgba(100, 180, 255, 0.1), transparent 55%),
-    linear-gradient(160deg, rgba(10, 20, 38, 0.97), rgba(4, 8, 18, 0.98));
-  backdrop-filter: blur(40px) saturate(160%);
-  -webkit-backdrop-filter: blur(40px) saturate(160%);
+    radial-gradient(ellipse at 20% 0%, rgba(255, 248, 235, 0.98) 0%, transparent 55%),
+    linear-gradient(160deg, rgba(255, 252, 246, 0.97) 0%, rgba(250, 242, 230, 0.98) 100%);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 -16px 48px rgba(0, 5, 20, 0.6);
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    0 -8px 48px rgba(80, 40, 10, 0.12),
+    0 -32px 80px rgba(80, 40, 10, 0.08);
   padding: 20px 20px 32px;
   display: flex;
   flex-direction: column;
@@ -32,7 +34,7 @@
   width: 36px;
   height: 3px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(180, 140, 90, 0.30);
   margin: 0 auto 4px;
 }
 
@@ -62,8 +64,8 @@
   width: 52px;
   padding: 10px 0;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(210, 185, 150, 0.25);
+  background: rgba(255, 252, 248, 0.72);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -74,7 +76,7 @@
 }
 
 .dayCardActive {
-  border-color: rgba(100, 180, 255, 0.45);
+  border-color: rgba(195, 155, 90, 0.60);
 }
 
 .dayActiveBg {
@@ -82,8 +84,8 @@
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(circle at 50% 30%, rgba(100, 180, 255, 0.25), transparent 70%),
-    linear-gradient(160deg, rgba(30, 60, 100, 0.7), rgba(10, 24, 50, 0.85));
+    radial-gradient(circle at 50% 30%, rgba(230, 190, 130, 0.38), transparent 70%),
+    linear-gradient(160deg, rgba(255, 245, 225, 0.90), rgba(248, 235, 208, 0.95));
   z-index: 0;
 }
 
@@ -97,7 +99,7 @@
 }
 
 .dayCard.dayCardActive .dayName {
-  color: rgba(140, 200, 255, 0.8);
+  color: rgba(150, 100, 35, 0.85);
 }
 
 .dayNum {
@@ -137,9 +139,9 @@
   position: relative;
   padding: 11px 4px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--ink-60);
+  border: 1px solid rgba(210, 185, 150, 0.22);
+  background: rgba(255, 252, 248, 0.68);
+  color: rgba(22, 17, 12, 0.52);
   font-size: 13px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: 0.04em;
@@ -149,13 +151,13 @@
 }
 
 .timeSlot:hover:not(:disabled) {
-  border-color: rgba(100, 180, 255, 0.3);
+  border-color: rgba(195, 155, 90, 0.45);
   color: var(--ink);
 }
 
 .timeSlotActive {
-  border-color: rgba(100, 180, 255, 0.55) !important;
-  color: rgba(220, 240, 255, 0.95) !important;
+  border-color: rgba(180, 135, 70, 0.65) !important;
+  color: rgba(22, 17, 12, 0.92) !important;
   font-weight: 600;
 }
 
@@ -163,8 +165,8 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 40%, rgba(100, 180, 255, 0.28), transparent 70%),
-    linear-gradient(160deg, rgba(25, 55, 95, 0.75), rgba(8, 20, 45, 0.85));
+    radial-gradient(circle at 50% 40%, rgba(225, 185, 110, 0.32), transparent 70%),
+    linear-gradient(160deg, rgba(255, 240, 210, 0.85), rgba(248, 228, 190, 0.90));
   z-index: 0;
 }
 
@@ -182,30 +184,36 @@
   padding: 16px;
   border-radius: 16px;
   border: none;
-  background:
-    radial-gradient(circle at 30% 40%, rgba(100, 180, 255, 0.2), transparent 60%),
-    linear-gradient(135deg, rgba(237, 244, 255, 0.95), rgba(200, 225, 255, 0.9));
-  color: rgba(4, 12, 28, 0.95);
+  background: linear-gradient(155deg,
+    rgba(38, 26, 14, 0.94) 0%,
+    rgba(22, 15, 6, 0.97) 100%
+  );
+  color: rgba(255, 245, 228, 0.96);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
   box-shadow:
-    0 8px 24px rgba(80, 160, 255, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  transition: opacity 0.2s ease;
+    inset 0 1px 0 rgba(255, 215, 140, 0.22),
+    0 4px 16px rgba(40, 20, 5, 0.22),
+    0 12px 32px rgba(40, 20, 5, 0.16);
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+
+.confirmBtn:active {
+  transform: scale(0.97);
 }
 
 .confirmBtn:disabled {
-  opacity: 0.3;
+  opacity: 0.28;
   cursor: default;
 }
 
 .closeButton {
   align-self: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(180, 145, 95, 0.25);
   background: transparent;
-  color: var(--ink-60);
+  color: rgba(22, 17, 12, 0.42);
   border-radius: 999px;
   padding: 9px 24px;
   font-size: 12px;
@@ -228,8 +236,8 @@
   text-align: center;
   padding: 18px;
   border-radius: 14px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: rgba(255, 120, 120, 0.9);
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  color: rgba(200, 60, 60, 0.85);
   font-size: 14px;
 }

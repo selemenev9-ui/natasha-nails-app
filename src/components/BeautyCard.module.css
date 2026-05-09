@@ -208,6 +208,154 @@
   border-color: rgba(210, 194, 172, 0.6);
 }
 
+.holoGlow {
+  position: absolute;
+  inset: 10% 12%;
+  border-radius: inherit;
+  background: radial-gradient(circle at 60% 20%, rgba(200, 180, 120, 0.22), transparent 60%);
+  filter: blur(16px);
+  opacity: 0.45;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.backTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  flex-shrink: 0;
+  z-index: 2;
+  position: relative;
+}
+
+.backLabel {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(64, 46, 34, 0.6);
+  white-space: nowrap;
+}
+
+.backTagline {
+  margin: 3px 0 0;
+  font-size: 13px;
+  font-family: var(--font-display);
+  font-style: italic;
+  color: rgba(44, 32, 22, 0.75);
+}
+
+.holoSeal {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: conic-gradient(from 180deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(200, 175, 120, 0.38),
+    rgba(255, 255, 255, 0.22));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: rgba(44, 32, 22, 0.65);
+  flex-shrink: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.3),
+    0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.signaturePanel {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+  z-index: 2;
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.signatureLabel {
+  font-size: 9px;
+  letter-spacing: 0.32em;
+  color: rgba(88, 64, 48, 0.5);
+  text-transform: uppercase;
+}
+
+.signatureValue {
+  font-size: 17px;
+  font-family: var(--font-display);
+  font-style: italic;
+  color: rgba(44, 32, 22, 0.88);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backMeta {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  flex-shrink: 0;
+  z-index: 2;
+  position: relative;
+}
+
+.metaBlock {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.metaLabel {
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  color: rgba(88, 64, 48, 0.55);
+  text-transform: uppercase;
+}
+
+.metaValue {
+  margin: 0;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: rgba(44, 32, 22, 0.92);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backHelp {
+  margin: auto 0 0;
+  padding-top: 8px;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(88, 64, 48, 0.45);
+  text-align: center;
+  z-index: 2;
+  position: relative;
+}
+
 .card.dark .rim {
   border-color: rgba(140, 200, 255, 0.35);
 }
